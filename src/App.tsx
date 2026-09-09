@@ -1,13 +1,23 @@
 import { Navigate, Route, Routes } from 'react-router'
-import Cabecera from './componentes/Cabecera'
 import BarraPestanas from './componentes/BarraPestanas'
-import Hoy from './pantallas/Hoy'
+import Cabecera from './componentes/Cabecera'
+import { useSesion } from './lib/sesion'
+import Ajustes from './pantallas/Ajustes'
 import Comida from './pantallas/Comida'
 import Entreno from './pantallas/Entreno'
+import Hoy from './pantallas/Hoy'
+import Login from './pantallas/Login'
 import Progreso from './pantallas/Progreso'
-import Ajustes from './pantallas/Ajustes'
 
 export default function App() {
+  const { sesion, cargando } = useSesion()
+
+  // getSession lee de localStorage, así que este estado dura milisegundos.
+  // Se pinta el fondo a secas para no provocar un parpadeo de contenido.
+  if (cargando) return <div className="min-h-dvh bg-fondo" />
+
+  if (!sesion) return <Login />
+
   return (
     <div className="flex min-h-dvh flex-col bg-fondo text-texto">
       <Cabecera />
