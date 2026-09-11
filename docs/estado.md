@@ -184,7 +184,7 @@ Decisiones de esta fase:
 `npm test` (vitest). Los de lógica corren sobre `fake-indexeddb`, así que
 ejercitan Dexie de verdad —transacciones e índices compuestos—, y los de
 pantalla montan el componente entero en jsdom contra esa misma base.
-**91 pruebas**, todas en verde:
+**121 pruebas**, todas en verde:
 
 - `src/lib/datos.test.ts` — fusión de cola, cancelación de envíos, cascadas,
   referencias a null, la descarga que no pisa lo pendiente.
@@ -204,6 +204,57 @@ pantalla montan el componente entero en jsdom contra esa misma base.
   de la siguiente serie, el calentamiento que no suma volumen.
 - `src/pantallas/sesion.test.tsx` — la sesión entera: la referencia de la última
   vez, anotar de un toque, la numeración por ejercicio, terminar y reabrir.
+- `src/lib/progreso.test.ts` — la media por días de calendario, la media semanal
+  dividida por días registrados, el calentamiento fuera del volumen.
+- `src/componentes/graficas/` — las marcas redondas del eje y el contenido de
+  los cuatro tooltips.
+
+### Fase 5 — Progreso
+
+| Archivo | Papel |
+|---|---|
+| `src/lib/progreso.ts` | Media móvil, progresión, medias semanales, volumen por grupo |
+| `src/componentes/graficas/` | Las cuatro gráficas, con Recharts cargado aparte |
+| `scripts/datos-demo.mjs` | Siembra (y borra) dos meses de datos en la base local |
+
+Cuatro tarjetas bajo un **único selector de periodo**: si cada gráfica filtrara
+por su cuenta, los números dejarían de cuadrar entre ellas.
+
+- **Peso corporal** con la media de 7 días delante y el dato diario detrás, más
+  tenue. La media es **por días de calendario**, no por las últimas siete
+  medidas: saltarse tres días no puede colar un dato de hace un mes. Se dibuja
+  un punto por cada día, también los que no hay pesaje, para que el eje no se
+  comprima donde faltan datos.
+- **Progresión por ejercicio**, con peso máximo, volumen o 1RM de Epley. Solo
+  salen en el desplegable los ejercicios con series registradas.
+- **Medias semanales** de calorías, separando entreno de descanso. Se divide por
+  **días con registro**, no entre siete: una semana a medio apuntar daría una
+  media falsa. Los macros van en la tabla, no en la gráfica: meterlos obligaría
+  a un segundo eje con otra escala, y dos ejes inventan una correlación que no
+  está en los datos.
+- **Volumen por grupo muscular** en series efectivas, no en kilos: es la medida
+  con la que se programa, y deja comparar un press con un curl.
+
+Decisiones de esta fase:
+
+- **Recharts se carga aparte.** Pesa 340 kB (100 kB comprimido), más que el
+  resto de la app junta, y solo hace falta aquí. Con `lazy()` el arranque desde
+  el icono no lo paga; el chunk principal se queda en 181 kB comprimidos.
+- **Los colores de las series están validados con un script**, no elegidos a
+  ojo: banda de luminosidad, suelo de croma, separación bajo daltonismo y
+  contraste sobre la superficie. Los pasos del tema oscuro son **otros**, no un
+  volteo de los claros: los claros se salen de la banda sobre fondo oscuro. Se
+  pasan como `var(--color-…)`, que SVG resuelve, así que el tema entra solo.
+- **Las marcas del eje Y se calculan a números redondos.** Dejarlo a la librería
+  daba escalas como 83 / 81,5 / 79,5: tres saltos distintos en el mismo eje.
+- **Cada gráfica tiene su tabla** ("Ver datos"), cerrada por defecto: ningún
+  número depende de distinguir un color ni de acertar con el dedo en un punto.
+- **El calentamiento no cuenta** en volumen, ni en 1RM, ni en el volumen por
+  grupo. Infla los números y no dice nada de la progresión.
+
+**Sin comprobar**: el hover de las gráficas. Recharts no responde a eventos de
+ratón sintéticos, así que la automatización del navegador no puede dispararlo;
+lo que sí está cubierto por tests es qué enseña cada tooltip al activarse.
 
 ### Repaso en el navegador
 
@@ -325,21 +376,19 @@ Añadidos y correcciones respecto a `docs/plan.md`, con su motivo:
 
 ## Siguiente paso
 
-**Fase 5 — Progreso**:
+**Fase 6 — Extras**, lo único que queda del plan:
 
-- Peso corporal con **media móvil de 7 días** en primer plano y el dato diario
-  detrás, más tenue.
-- Progresión por ejercicio: peso máximo, volumen total o 1RM de Epley.
-- Medias semanales de calorías y macros, separadas por tipo de día.
-- Volumen semanal por grupo muscular.
+- Escáner de código de barras y Open Food Facts.
+- Importar el JSON del puente manual de macros, con vista previa editable, y el
+  bloque de instrucciones copiables en Ajustes.
+- Fotos de progreso: redimensionado en el cliente, subida al bucket privado,
+  galería y comparación entre dos fechas.
+- Exportación completa a JSON desde Ajustes.
+- Recetas y comidas guardadas de un toque (quedó pendiente de la fase 2).
 
-Recharts debe entrar con `import()` diferido, no en el chunk principal: el
-bundle ya va por 612 kB (178 kB comprimido) y el plan pide abrir en menos de
-dos segundos.
-
-Luego la fase 6: escáner de código de barras, Open Food Facts, importación del
-JSON de macros, fotos de progreso y exportación. Y queda pendiente de Comida:
-recetas y comidas guardadas de un toque.
+Y la capa `estimarMacros(entrada)` que pide el plan: una interfaz con una sola
+implementación de puente manual, para que cambiar a una API de visión sea
+cambiar de implementación y no reescribir.
 
 ## Pendiente de tu parte
 

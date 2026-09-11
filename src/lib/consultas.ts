@@ -244,6 +244,64 @@ export function useSesiones(limite = 30): Sesion[] {
   )
 }
 
+// -----------------------------------------------------------------------------
+// Progreso
+// -----------------------------------------------------------------------------
+
+/**
+ * Las lecturas de Progreso van por rango de fechas contra el índice de `fecha`.
+ * Todas reciben el mismo `desde`, que sale del único selector de la pantalla:
+ * si cada gráfica filtrara por su cuenta, los números dejarían de cuadrar entre
+ * ellas.
+ */
+export function useMedidas(desde: string): MedidaCorporal[] {
+  return (
+    useLiveQuery(
+      () => db.medidas_corporales.where('fecha').aboveOrEqual(desde).toArray(),
+      [desde],
+    ) ?? []
+  )
+}
+
+export function useRegistros(desde: string): RegistroComida[] {
+  return (
+    useLiveQuery(
+      () => db.registros_comida.where('fecha').aboveOrEqual(desde).toArray(),
+      [desde],
+    ) ?? []
+  )
+}
+
+export function useSesionesDesde(desde: string): Sesion[] {
+  return (
+    useLiveQuery(() => db.sesiones.where('fecha').aboveOrEqual(desde).toArray(), [desde]) ?? []
+  )
+}
+
+/**
+ * Las series de un conjunto de sesiones. Se filtran por sesión y no por fecha
+ * porque `series` no tiene fecha propia: la lleva su sesión.
+ */
+export function useSeriesDe(sesiones: Sesion[]): Serie[] {
+  const clave = sesiones.map((s) => s.id).sort().join(',')
+
+  return (
+    useLiveQuery(async () => {
+      if (!clave) return [] as Serie[]
+      return db.series.where('sesion_id').anyOf(clave.split(',')).toArray()
+    }, [clave]) ?? []
+  )
+}
+
+/** Tipo de cada día marcado, para separar entreno de descanso en las medias. */
+export function useTiposDeDia(desde: string): Map<string, TipoDia> {
+  const dias = useLiveQuery(
+    () => db.dias.where('fecha').aboveOrEqual(desde).toArray(),
+    [desde],
+  )
+  return new Map((dias ?? []).map((d) => [d.fecha, d.tipo]))
+}
+
 /** Si hay algo en la base local: distingue "sin datos" de "aún descargando". */
 export function useHayDatos(): boolean | undefined {
   return useLiveQuery(async () => (await db.ejercicios.count()) > 0)

@@ -12,10 +12,21 @@
   --color-error: #dc2626;
 
   /* Un color fijo por macro, el mismo en las barras de Hoy y en las gráficas
-     de Progreso: es lo que permite leer una barra sin buscar la leyenda. */
+     de Progreso: es lo que permite leer una barra sin buscar la leyenda.
+     Los tres pasan el validador de paletas categóricas (banda de luminosidad,
+     suelo de croma, separación bajo daltonismo y contraste sobre la
+     superficie); no están elegidos a ojo. */
   --color-proteina: #2563eb;
   --color-grasa: #d97706;
   --color-carbos: #7c3aed;
+
+  /* Tipo de día en las gráficas. Este par pasa el validador en claro y en
+     oscuro con los mismos valores, así que no cambia entre temas. */
+  --color-entreno: #059669;
+  --color-descanso: #0284c7;
+
+  /* Rejilla y ejes: un paso por encima de la superficie, nunca discontinuos. */
+  --color-rejilla: #e2e8f0;
 }
 
 /* Modo oscuro por preferencia del sistema: solo se reasignan los valores. */
@@ -29,9 +40,13 @@
     --color-acento: #34d399;
     --color-aviso: #fbbf24;
     --color-error: #f87171;
-    --color-proteina: #60a5fa;
-    --color-grasa: #fbbf24;
-    --color-carbos: #a78bfa;
+    /* Pasos distintos para el tema oscuro, revalidados contra la superficie
+       oscura: no es un volteo automático de los claros, que se salen de la
+       banda de luminosidad sobre fondo oscuro. */
+    --color-proteina: #3b82f6;
+    --color-grasa: #d97706;
+    --color-carbos: #8b5cf6;
+    --color-rejilla: #1f2a35;
   }
 }
 
