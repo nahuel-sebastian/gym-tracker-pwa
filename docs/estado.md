@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Última actualización: 9 de septiembre de 2026.
+Última actualización: 11 de septiembre de 2026.
 
 El plan original está en `docs/plan.md` y no se ha modificado. Este archivo
 registra lo construido, las decisiones tomadas sobre el plan y cómo seguir.
@@ -60,9 +60,77 @@ Autenticación: cliente de Supabase con sesión persistente, contexto de sesión
 pantalla de login (sin registro, la cuenta se crea a mano) y cierre de sesión
 desde Ajustes.
 
-### Pruebas ejecutadas
+### Fase 4 (adelantada) — Capa de mutación offline
 
-Todas verificadas contra la base de datos local, no revisadas a ojo:
+Toda escritura de la app pasa por `guardar()` / `borrar()` en `src/lib/datos.ts`,
+nunca por `supabase.from(...)`. El camino es siempre el mismo: se aplica a
+IndexedDB, la interfaz se refresca sola, y el envío se encola. La red no
+bloquea nada.
+
+| Archivo | Papel |
+|---|---|
+| `src/lib/tipos.ts` | Tipos de las 14 tablas, espejo del esquema |
+| `src/lib/fechas.ts` | Fechas de día en hora local, nunca `toISOString()` |
+| `src/lib/db.ts` | Dexie: 14 tablas + `cola`, `fallidas` y `meta` |
+| `src/lib/datos.ts` | API única de escritura, fusión de cola y cascadas locales |
+| `src/lib/sincronizacion.ts` | Vaciado de la cola, reintentos, estado observable |
+| `src/lib/descarga.ts` | Descarga incremental por marca de agua de `updated_at` |
+| `src/lib/senal.ts` | Rompe el ciclo de módulos entre datos y sincronización |
+| `src/lib/useSync.ts` | Estado de sincronización para React |
+
+Comportamientos que sostienen el modo offline:
+
+- **Fusión de la cola.** Corregir cinco veces el peso de una serie sin
+  cobertura deja **una** operación, no cinco. La operación fusionada conserva
+  su puesto en la cola: si se colara detrás de sus series, el servidor las
+  rechazaría por clave ajena.
+- **Borrar lo que el servidor no conoce cancela su envío**, en vez de encolar
+  el borrado de algo inexistente.
+- **Cascadas replicadas en local.** Borrar una sesión borra sus series aquí y
+  cancela los envíos pendientes de esas series; sin eso, un insert rezagado
+  crearía filas huérfanas tras la cascada del servidor. Lo que el servidor pone
+  a null (`sesiones.dia_id`, `registros_comida.alimento_id`) se pone a null
+  también aquí.
+- **Orden estricto de envío.** Una operación que falla detiene el vaciado; no
+  se adelanta la siguiente. Ese orden es lo único que garantiza que una sesión
+  llegue antes que sus series.
+- **Los fallos de transporte no se descartan nunca**, por muchos reintentos que
+  lleven. Los definitivos (códigos 22, 23, 42 de Postgres) se apartan a
+  `fallidas` a la primera y el vaciado sigue: un envío imposible no puede
+  bloquear para siempre las series que vengan detrás. Ajustes los enseña, con
+  botones de reintentar y descartar.
+- **Retroceso exponencial con jitter**, de 2 s a 5 min de techo.
+- **La descarga no pisa lo que está pendiente de subir.** Es la parte de
+  "última escritura gana" que evita perder un cambio sin sincronizar.
+- **Cerrar sesión borra la base local**, y al arrancar se comprueba que los
+  datos locales son de la cuenta autenticada. IndexedDB sobrevive al `signOut`.
+- `EstadoSync` lee el tamaño real de la cola, no `navigator.onLine`: tener
+  cobertura no significa que lo registrado en el gimnasio ya esté guardado.
+
+### Pruebas automatizadas
+
+`npm test` (vitest sobre `fake-indexeddb`, así que ejercita Dexie de verdad:
+transacciones e índices compuestos). **34 pruebas**, todas en verde:
+
+- `src/lib/datos.test.ts` — fusión de cola, cancelación de envíos, cascadas,
+  referencias a null, la descarga que no pisa lo pendiente.
+- `src/lib/sincronizacion.test.ts` — orden de envío, reintentos, que un fallo
+  de red no descarte datos, que un fallo definitivo no atasque la cola.
+- `src/lib/fechas.test.ts` — la cena de las 22:00 que debe contar como de hoy.
+
+Dos errores reales que encontraron estas pruebas:
+
+1. `db.cola.where('tabla')` no funcionaba: Dexie no resuelve una consulta por
+   el primer componente de un índice compuesto. El filtro que protege lo
+   pendiente de subir **no filtraba nada** y la excepción quedaba tragada
+   dentro de la transacción.
+2. Un fallo de red gastaba el contador de reintentos y a los diez intentos la
+   operación se descartaba. Una sesión entera registrada en un sótano se
+   habría perdido a los veinte minutos.
+
+### Pruebas contra la base de datos real
+
+Verificadas contra el Supabase local, no revisadas a ojo:
 
 - Anónimo leyendo o escribiendo cualquier tabla → `42501 permission denied`.
 - Un segundo usuario ve **0** filas de los datos del primero.
@@ -71,6 +139,20 @@ Todas verificadas contra la base de datos local, no revisadas a ojo:
 - `ultimas_series()` devuelve las series correctas y **vacío** para otro usuario.
 - Un registro de comida sin alimento, receta ni descripción → rechazado.
 - Una segunda rutina activa → rechazada por el índice único parcial.
+
+Y de la capa offline, con `node scripts/verificar-offline.mjs` contra el REST real:
+
+- La consulta de la descarga (`select *` + `gte(updated_at)` + orden doble +
+  `range`) devuelve las 70 filas, y dos páginas de 40 no solapan ni pierden.
+- Un upsert **sin `user_id`** queda con el `auth.uid()` correcto: el default de
+  la columna funciona y el cliente no tiene que recordar el dato.
+- El trigger mueve `updated_at` al actualizar, que es lo que hace avanzar la
+  marca de agua de la descarga.
+- Una serie creada con uuid de cliente se relaciona con su sesión igual.
+- Una clave ajena rota devuelve `23503`, el código que la capa clasifica como
+  definitivo.
+- Borrar un id inexistente **no** es un error, así que un reintento que llegue
+  de más no rompe nada.
 
 ---
 
@@ -100,7 +182,24 @@ Añadidos y correcciones respecto a `docs/plan.md`, con su motivo:
 8. **La fase offline se adelanta.** El plan la ponía en cuarto lugar; construir
    antes las pantallas contra `supabase.from(...)` obligaría a reescribirlas.
    La capa de mutación va antes que las pantallas.
-9. **Versiones por encima del plan**: React 19 en vez de 18, Vite 8,
+9. **La base local es una copia, no una caché.** El plan pedía cachear los
+   últimos 30 días; se descargan las catorce tablas completas. Las gráficas de
+   Progreso y la vista de "última vez" necesitan el histórico, y trocearlo por
+   fechas obligaría a dos rutas de lectura según haya o no cobertura. Son los
+   datos de una persona: un año de uso no llega al megabyte.
+10. **`user_id` no se envía nunca.** La columna tiene `default auth.uid()` y
+    queda verificado que funciona. La base local es de un solo usuario y no
+    necesita el dato; a cambio, `meta.usuario` guarda de quién son los datos
+    locales para poder borrarlos si cambia la cuenta.
+11. **El servidor es dueño de `created_at` y `updated_at`.** El cliente no los
+    envía. La marca de agua de la descarga sale de los propios datos
+    descargados, no del reloj del teléfono, que puede ir descuadrado.
+12. **Los borrados hechos en otro dispositivo no se propagan.** Una fila
+    borrada allí deja de venir en la descarga y aquí se queda. Límite aceptado:
+    el plan descarta expresamente construir resolución de conflictos, y hay un
+    usuario con un teléfono. "Recargar todo" en Ajustes no lo arregla; haría
+    falta una tabla de tumbas.
+13. **Versiones por encima del plan**: React 19 en vez de 18, Vite 8,
    Tailwind 4, react-router 8. Node del sistema era 18 (sin soporte desde abril
    de 2025) → nvm con Node 22.
 
@@ -108,22 +207,17 @@ Añadidos y correcciones respecto a `docs/plan.md`, con su motivo:
 
 ## Siguiente paso
 
-**Capa de mutación offline**, antes de construir ninguna pantalla con datos:
+**Fase 2 — Comida y Hoy**, ahora que ya hay sobre qué construirlas:
 
-- Dexie sobre IndexedDB: caché local y cola de escrituras.
-- API única de escritura que genera el uuid, aplica el cambio al estado local
-  de inmediato y encola el envío. La interfaz nunca espera a la red.
-- Vaciado de la cola con reintentos y retroceso exponencial, usando
-  `Prefer: resolution=merge-duplicates` (ya verificado como idempotente).
-- Fusión de operaciones en cola: borrar una fila que aún no se ha enviado debe
-  **cancelar** su inserción, no encolar el borrado de algo inexistente.
-- `EstadoSync` pasa a leer el tamaño real de la cola en vez de `navigator.onLine`.
+- Objetivos nutricionales en Ajustes (dos filas, entreno y descanso).
+- Pantalla Hoy: selector de tipo de día, anillo de calorías, barras de macros,
+  comidas del día por momento, peso de la mañana.
+- Pantalla Comida: buscador de la biblioteca ordenado por `veces_usado`, alta
+  manual de alimentos, registro en dos toques, duplicar día anterior.
 
-Después, en este orden: Comida y Hoy → Entreno (con "última vez" precacheada)
-→ Progreso → extras (escáner, Open Food Facts, importación de JSON, fotos,
+Después: Entreno (con "última vez" vía `ultimas_series()`, precacheada) →
+Progreso → extras (escáner, Open Food Facts, importación de JSON, fotos,
 exportación).
-
----
 
 ## Pendiente de tu parte
 
@@ -146,11 +240,10 @@ Crear el proyecto real en supabase.com. Hasta entonces todo corre en local.
 - `0005` es un bloque `DO`. Convertirlo en una función
   `sembrar_catalogo_ejercicios()` permitiría volver a llamarla sin repetir el
   SQL, útil para reconstruir el entorno local tras un `db reset`.
-- Sin tests automatizados todavía. Los primeros que hacen falta son los de la
-  cola de sincronización y los del parser del JSON de macros: es donde se
-  pierden datos en silencio.
-- La fecha se calculará en el cliente en hora local, nunca con
-  `toISOString()`, o una cena a las 22:00 acabaría contando como del día
-  siguiente.
+- Falta el test del parser del JSON de macros, el otro sitio donde se pierden
+  datos en silencio. La cola ya está cubierta.
+- El bundle va por 560 kB (165 kB comprimido) porque Recharts entra en el
+  chunk principal. Hay que cargar Progreso con `import()` diferido antes de
+  dar la fase 5 por hecha; el plan pide abrir en menos de dos segundos.
 - Sin definir: si el volumen de un ejercicio unilateral cuenta doble, y si el
   peso registrado es por lado o total.

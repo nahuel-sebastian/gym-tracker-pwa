@@ -1,6 +1,8 @@
+import { useEffect } from 'react'
 import { Navigate, Route, Routes } from 'react-router'
 import BarraPestanas from './componentes/BarraPestanas'
 import Cabecera from './componentes/Cabecera'
+import { arrancarSincronizacion } from './lib/sincronizacion'
 import { useSesion } from './lib/sesion'
 import Ajustes from './pantallas/Ajustes'
 import Comida from './pantallas/Comida'
@@ -11,6 +13,23 @@ import Progreso from './pantallas/Progreso'
 
 export default function App() {
   const { sesion, cargando } = useSesion()
+  const idUsuario = sesion?.user.id
+
+  useEffect(() => {
+    if (!idUsuario) return
+    let limpiar: (() => void) | undefined
+    let cancelado = false
+
+    void arrancarSincronizacion(idUsuario).then((fn) => {
+      if (cancelado) fn()
+      else limpiar = fn
+    })
+
+    return () => {
+      cancelado = true
+      limpiar?.()
+    }
+  }, [idUsuario])
 
   // getSession lee de localStorage, así que este estado dura milisegundos.
   // Se pinta el fondo a secas para no provocar un parpadeo de contenido.
