@@ -8,6 +8,14 @@
   --color-texto: #0f172a;
   --color-tenue: #64748b;
   --color-acento: #059669;
+  --color-aviso: #d97706;
+  --color-error: #dc2626;
+
+  /* Un color fijo por macro, el mismo en las barras de Hoy y en las gráficas
+     de Progreso: es lo que permite leer una barra sin buscar la leyenda. */
+  --color-proteina: #2563eb;
+  --color-grasa: #d97706;
+  --color-carbos: #7c3aed;
 }
 
 /* Modo oscuro por preferencia del sistema: solo se reasignan los valores. */
@@ -19,6 +27,11 @@
     --color-texto: #e8edf2;
     --color-tenue: #8b9bab;
     --color-acento: #34d399;
+    --color-aviso: #fbbf24;
+    --color-error: #f87171;
+    --color-proteina: #60a5fa;
+    --color-grasa: #fbbf24;
+    --color-carbos: #a78bfa;
   }
 }
 
@@ -42,4 +55,10 @@ input,
 select,
 textarea {
   font-size: 16px;
+}
+
+/* Los números de peso, reps y macros en tabular: así no bailan las columnas
+   al cambiar una cifra mientras se registra una serie. */
+.cifras {
+  font-variant-numeric: tabular-nums;
 }

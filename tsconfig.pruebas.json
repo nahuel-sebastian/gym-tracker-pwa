@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.pruebas.tsbuildinfo",
+    "types": ["vite/client", "node", "vitest/globals"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "composite": true
+  },
+  "include": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/pruebas", "src/lib", "src/pantallas", "src/componentes"]
+}

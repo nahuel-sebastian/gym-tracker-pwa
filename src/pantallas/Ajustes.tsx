@@ -1,8 +1,10 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useState } from 'react'
+import BloqueObjetivos from '../componentes/BloqueObjetivos'
 import Marcador from '../componentes/Marcador'
 import { db, type OperacionFallida } from '../lib/db'
 import { descargar } from '../lib/descarga'
+import { useHoy } from '../lib/consultas'
 import { useSesion } from '../lib/sesion'
 import {
   cerrarSesion,
@@ -14,6 +16,7 @@ import { useSync } from '../lib/useSync'
 
 export default function Ajustes() {
   const { sesion } = useSesion()
+  const fecha = useHoy()
 
   return (
     <div className="space-y-4">
@@ -32,13 +35,14 @@ export default function Ajustes() {
         </p>
       </section>
 
+      <BloqueObjetivos fecha={fecha} />
+
       <BloqueSincronizacion />
 
       <Marcador
         titulo="Ajustes"
         descripcion="Objetivos nutricionales y herramientas de datos."
         pendiente={[
-          'Objetivos de entreno y descanso',
           'Instrucciones copiables para el puente manual de macros',
           'Exportación completa a JSON',
         ]}

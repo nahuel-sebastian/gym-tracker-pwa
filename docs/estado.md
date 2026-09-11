@@ -107,18 +107,66 @@ Comportamientos que sostienen el modo offline:
 - `EstadoSync` lee el tamaño real de la cola, no `navigator.onLine`: tener
   cobertura no significa que lo registrado en el gimnasio ya esté guardado.
 
+### Fase 2 — Comida y Hoy
+
+| Archivo | Papel |
+|---|---|
+| `src/lib/nutricion.ts` | Macros: escalar por gramos, sumar, coherencia 4/9/4 |
+| `src/lib/numeros.ts` | Coma decimal del teclado español, formato de cifras |
+| `src/lib/momentos.ts` | Los cuatro momentos y cuál proponer según la hora |
+| `src/lib/acciones.ts` | Acciones con nombre: marcar día, pesarse, registrar, duplicar |
+| `src/lib/consultas.ts` | Lecturas en vivo sobre IndexedDB (`useLiveQuery`) |
+| `src/componentes/` | Anillo, barras de macros, hoja inferior, campos, hojas de alta y edición |
+
+**Hoy**: tipo de día (ocupa una tarjeta entera hasta marcarlo), anillo de
+calorías, tres barras de macros, acceso al entreno si toca, peso de la mañana,
+y las comidas agrupadas por momento con edición y borrado.
+
+**Comida**: buscador de la biblioteca ordenado por uso, alta de alimentos con
+aviso de ficha incoherente, y duplicar el día anterior.
+
+**Ajustes**: objetivos de entreno y descanso.
+
+Decisiones de esta fase:
+
+- **El anillo no se recorta al 100 %**: pasarse se enseña en kcal de más. Un
+  diario que esconde el exceso no sirve.
+- **La coma decimal se acepta en todos los campos de cifras.** El teclado
+  decimal de un iPhone en español da coma; sin convertirla, "82,5" sería `NaN`.
+- **Aviso, no bloqueo, cuando los macros no cuadran con las kcal.** Teclear 36
+  de grasa en vez de 3,6 arrastra el diario desde ese momento, pero la etiqueta
+  manda sobre la aritmética y hay alimentos con desvíos legítimos.
+- **Las hojas inferiores se montan y desmontan**, no tienen estado de "abierta".
+  Así el formulario nace con sus valores iniciales en vez de sincronizarlos con
+  un efecto cada vez que se abre.
+- **`useHoy()` corrige la fecha sola.** Una PWA instalada no se recarga: se
+  queda abierta días. Sin esto, el desayuno se registraría en el día de ayer.
+- **Guardar un objetivo no sobrescribe el anterior**: crea una vigencia nueva
+  desde hoy.
+
 ### Pruebas automatizadas
 
-`npm test` (vitest sobre `fake-indexeddb`, así que ejercita Dexie de verdad:
-transacciones e índices compuestos). **34 pruebas**, todas en verde:
+`npm test` (vitest). Los de lógica corren sobre `fake-indexeddb`, así que
+ejercitan Dexie de verdad —transacciones e índices compuestos—, y los de
+pantalla montan el componente entero en jsdom contra esa misma base.
+**71 pruebas**, todas en verde:
 
 - `src/lib/datos.test.ts` — fusión de cola, cancelación de envíos, cascadas,
   referencias a null, la descarga que no pisa lo pendiente.
 - `src/lib/sincronizacion.test.ts` — orden de envío, reintentos, que un fallo
   de red no descarte datos, que un fallo definitivo no atasque la cola.
 - `src/lib/fechas.test.ts` — la cena de las 22:00 que debe contar como de hoy.
+- `src/lib/nutricion.test.ts` — escalado, suma sin error de coma flotante,
+  detección de la ficha incoherente.
+- `src/lib/numeros.test.ts` — la coma decimal del teclado español.
+- `src/lib/momentos.test.ts` — a la una de la noche sigue siendo la cena.
+- `src/pantallas/comida.test.tsx` — el registro en dos toques de punta a punta:
+  buscar, confirmar, y comprobar en la base los macros congelados, el contador
+  de uso y las dos operaciones en la cola.
+- `src/pantallas/hoy.test.tsx` — objetivo según el tipo de día, el exceso que
+  se enseña, un pesaje por día, borrar una comida.
 
-Dos errores reales que encontraron estas pruebas:
+Errores reales que encontraron estas pruebas:
 
 1. `db.cola.where('tabla')` no funcionaba: Dexie no resuelve una consulta por
    el primer componente de un índice compuesto. El filtro que protege lo
@@ -127,6 +175,8 @@ Dos errores reales que encontraron estas pruebas:
 2. Un fallo de red gastaba el contador de reintentos y a los diez intentos la
    operación se descartaba. Una sesión entera registrada en un sótano se
    habría perdido a los veinte minutos.
+3. El peso se enseñaba como "78,40 kg": el formateador rellenaba con ceros
+   hasta los decimales pedidos en vez de tratarlos como máximo.
 
 ### Pruebas contra la base de datos real
 
@@ -207,17 +257,19 @@ Añadidos y correcciones respecto a `docs/plan.md`, con su motivo:
 
 ## Siguiente paso
 
-**Fase 2 — Comida y Hoy**, ahora que ya hay sobre qué construirlas:
+**Fase 3 — Entreno**, que es la mitad que falta del uso diario:
 
-- Objetivos nutricionales en Ajustes (dos filas, entreno y descanso).
-- Pantalla Hoy: selector de tipo de día, anillo de calorías, barras de macros,
-  comidas del día por momento, peso de la mañana.
-- Pantalla Comida: buscador de la biblioteca ordenado por `veces_usado`, alta
-  manual de alimentos, registro en dos toques, duplicar día anterior.
+- Gestión de rutinas: crear, ordenar días y ejercicios, activar una.
+- Sesión en curso: filas de series con peso, reps y RIR, teclado numérico,
+  añadir un ejercicio fuera del plan, notas y sensación.
+- **"Última vez" junto a cada ejercicio**, con `ultimas_series()` precacheada
+  antes de bajar al gimnasio, y precarga de cada serie con esos valores.
+- Catálogo de ejercicios editable.
 
-Después: Entreno (con "última vez" vía `ultimas_series()`, precacheada) →
-Progreso → extras (escáner, Open Food Facts, importación de JSON, fotos,
-exportación).
+Después: Progreso (gráficas, con Recharts cargado aparte) → extras (escáner,
+Open Food Facts, importación de JSON, fotos, exportación).
+
+Queda pendiente de Comida: recetas y comidas guardadas de un toque.
 
 ## Pendiente de tu parte
 

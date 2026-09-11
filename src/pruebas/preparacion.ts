@@ -22,3 +22,23 @@ if (typeof globalThis.addEventListener !== 'function') {
   global_.addEventListener = () => {}
   global_.removeEventListener = () => {}
 }
+
+// jsdom no trae `crypto.randomUUID`, y el cliente genera todos los uuid.
+if (!globalThis.crypto?.randomUUID) {
+  const { webcrypto } = await import('node:crypto')
+  Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true })
+}
+
+// Tampoco trae `matchMedia`, que Recharts y las utilidades de tema consultan.
+if (typeof globalThis.matchMedia !== 'function') {
+  globalThis.matchMedia = ((consulta: string) => ({
+    matches: false,
+    media: consulta,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof globalThis.matchMedia
+}
