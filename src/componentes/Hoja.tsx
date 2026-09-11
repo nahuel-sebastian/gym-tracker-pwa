@@ -45,7 +45,7 @@ export default function Hoja({ titulo, onCerrar, children }: Props) {
         role="dialog"
         aria-modal="true"
         aria-label={titulo}
-        className="relative max-h-[88dvh] overflow-y-auto rounded-t-3xl border-t border-borde bg-superficie pb-[calc(env(safe-area-inset-bottom)+1rem)]"
+        className="relative mx-auto max-h-[88dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl border-t border-borde bg-superficie pb-[calc(env(safe-area-inset-bottom)+1rem)]"
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-borde bg-superficie px-4 py-3">
           <h2 className="text-base font-semibold">{titulo}</h2>

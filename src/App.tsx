@@ -43,7 +43,10 @@ export default function App() {
   return (
     <div className="flex min-h-dvh flex-col bg-fondo text-texto">
       <Cabecera />
-      <main className="flex-1 px-4 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] pt-3">
+      {/* La app está pensada para un iPhone; en una pantalla ancha se centra a
+          la anchura de un móvil en vez de estirarse, que es como se diseñó y
+          como se va a usar. */}
+      <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] pt-3">
         <Routes>
           <Route path="/" element={<Hoy />} />
           <Route path="/comida" element={<Comida />} />

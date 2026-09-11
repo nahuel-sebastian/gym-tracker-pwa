@@ -205,6 +205,28 @@ pantalla montan el componente entero en jsdom contra esa misma base.
 - `src/pantallas/sesion.test.tsx` — la sesión entera: la referencia de la última
   vez, anotar de un toque, la numeración por ejercicio, terminar y reabrir.
 
+### Repaso en el navegador
+
+Recorrido completo con la app corriendo contra el Supabase local: login,
+objetivos, marcar el día, alta de alimento, registro, lista por momentos,
+sesión con series, rutinas y catálogo. Todo funciona de punta a punta. Cinco
+cosas que solo se ven mirando y que quedan arregladas:
+
+1. **El icono de Ajustes era un círculo con rayos**, que se lee como un sol,
+   o sea como un interruptor de tema. Ahora es un engranaje.
+2. **Nada limitaba el ancho**: en una pantalla de escritorio la app se estiraba
+   a toda la ventana. Se centra a `max-w-lg`, que es como se va a usar.
+3. **Borrar una rutina no pedía confirmación** y se lleva por delante sus días
+   y ejercicios. Ahora va en dos pasos y al final de la pantalla.
+4. **El aviso de "Guardado" del objetivo nunca llegaba a verse**: la clave del
+   formulario incluía el id del objetivo, y la fila recién escrita entraba en
+   la consulta al instante, remontando el formulario. Mismo patrón que en la
+   fila de anotar series: lo tecleado aparte, `null` para "aquí no ha tocado
+   nadie".
+5. **No había forma de corregir una ficha ya creada.** Se añade "Editar ficha"
+   dentro de la hoja de cantidad, que es donde se descubre el error, y al
+   guardar se vuelve a la cantidad.
+
 Errores reales que encontraron estas pruebas:
 
 1. `db.cola.where('tabla')` no funcionaba: Dexie no resuelve una consulta por

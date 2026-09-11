@@ -30,6 +30,7 @@ export default function Rutinas() {
   const [seleccionada, setSeleccionada] = useState<string | null>(null)
   const [creando, setCreando] = useState(false)
   const [nombre, setNombre] = useState('')
+  const [confirmandoBorrado, setConfirmandoBorrado] = useState(false)
 
   const abierta = rutinas.find((r) => r.id === seleccionada) ?? rutinas.find((r) => r.activa)
 
@@ -47,7 +48,10 @@ export default function Rutinas() {
         {rutinas.map((r) => (
           <button
             key={r.id}
-            onClick={() => setSeleccionada(r.id)}
+            onClick={() => {
+              setSeleccionada(r.id)
+              setConfirmandoBorrado(false)
+            }}
             className={`flex min-h-12 w-full items-center justify-between border-b border-borde px-4 text-left text-sm last:border-b-0 active:bg-fondo ${
               abierta?.id === r.id ? 'font-semibold' : ''
             }`}
@@ -67,22 +71,36 @@ export default function Rutinas() {
 
       {abierta && (
         <>
-          <div className="flex gap-2">
-            {!abierta.activa && (
-              <Boton onClick={() => void activarRutina(abierta.id)}>Activar</Boton>
-            )}
-            <Boton
-              variante="peligro"
-              onClick={() => {
-                void borrarRutina(abierta.id)
-                setSeleccionada(null)
-              }}
-            >
-              Borrar rutina
-            </Boton>
-          </div>
+          {!abierta.activa && (
+            <Boton onClick={() => void activarRutina(abierta.id)}>Activar</Boton>
+          )}
 
           <DiasDeRutina rutinaId={abierta.id} />
+
+          {/* Borrar una rutina se lleva sus días y sus ejercicios por delante,
+              así que va al final y en dos pasos. Las sesiones ya entrenadas
+              sobreviven: su `dia_id` queda a null y conservan el nombre. */}
+          {confirmandoBorrado ? (
+            <div className="flex gap-2">
+              <Boton variante="secundario" onClick={() => setConfirmandoBorrado(false)}>
+                Cancelar
+              </Boton>
+              <Boton
+                variante="peligro"
+                onClick={() => {
+                  void borrarRutina(abierta.id)
+                  setSeleccionada(null)
+                  setConfirmandoBorrado(false)
+                }}
+              >
+                Sí, borrar «{abierta.nombre}»
+              </Boton>
+            </div>
+          ) : (
+            <Boton variante="peligro" onClick={() => setConfirmandoBorrado(true)}>
+              Borrar rutina
+            </Boton>
+          )}
         </>
       )}
 

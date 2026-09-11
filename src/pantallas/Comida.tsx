@@ -26,8 +26,9 @@ export default function Comida() {
   const alimentos = useAlimentos(busqueda)
   const [aAnadir, setAAnadir] = useState<Alimento | null>(null)
   const [creando, setCreando] = useState(false)
+  const [editando, setEditando] = useState<Alimento | null>(null)
 
-  /** Recién creado: se abre directamente la cantidad, sin volver a buscarlo. */
+  /** Tras crear o corregir una ficha se vuelve a la cantidad, sin buscarla otra vez. */
   async function trasCrear(id: string) {
     const nuevo = await db.alimentos.get(id)
     if (nuevo) setAAnadir(nuevo)
@@ -119,6 +120,10 @@ export default function Comida() {
           momentoInicial={momento}
           onCerrar={() => setAAnadir(null)}
           onRegistrado={() => setBusqueda('')}
+          onEditarFicha={() => {
+            setEditando(aAnadir)
+            setAAnadir(null)
+          }}
         />
       )}
 
@@ -126,6 +131,15 @@ export default function Comida() {
         <HojaAlimento
           nombreInicial={busqueda.trim()}
           onCerrar={() => setCreando(false)}
+          onGuardado={(id) => void trasCrear(id)}
+        />
+      )}
+
+      {editando && (
+        <HojaAlimento
+          alimento={editando}
+          onCerrar={() => setEditando(null)}
+          // Corregir la ficha devuelve a la cantidad, que es de donde se venía.
           onGuardado={(id) => void trasCrear(id)}
         />
       )}

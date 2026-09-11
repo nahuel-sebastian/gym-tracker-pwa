@@ -13,6 +13,8 @@ type Props = {
   momentoInicial: Momento
   onCerrar: () => void
   onRegistrado?: () => void
+  /** Abre la ficha del alimento para corregirla. */
+  onEditarFicha?: () => void
 }
 
 /**
@@ -27,6 +29,7 @@ export default function HojaAnadirAlimento({
   momentoInicial,
   onCerrar,
   onRegistrado,
+  onEditarFicha,
 }: Props) {
   const [gramos, setGramos] = useState(() => aTexto(alimento.porcion_defecto_g ?? 100))
   const [momento, setMomento] = useState<Momento>(momentoInicial)
@@ -50,7 +53,17 @@ export default function HojaAnadirAlimento({
   return (
     <Hoja titulo={alimento.nombre} onCerrar={onCerrar}>
       <div className="space-y-4">
-        {alimento.marca && <p className="-mt-2 text-sm text-tenue">{alimento.marca}</p>}
+        <div className="-mt-2 flex items-baseline justify-between gap-3">
+          <p className="text-sm text-tenue">{alimento.marca ?? ''}</p>
+          {onEditarFicha && (
+            <button
+              onClick={onEditarFicha}
+              className="shrink-0 text-sm font-medium text-acento active:opacity-70"
+            >
+              Editar ficha
+            </button>
+          )}
+        </div>
 
         <CampoNumero
           etiqueta="Cantidad"

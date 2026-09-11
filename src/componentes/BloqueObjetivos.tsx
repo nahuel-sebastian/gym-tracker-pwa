@@ -32,12 +32,15 @@ export default function BloqueObjetivos({ fecha }: { fecha: string }) {
 
       <Segmentado opciones={OPCIONES} valor={tipo} onCambio={setTipo} />
 
-      {/* La clave remonta el formulario al cambiar de pestaña o al llegar el
-          objetivo descargado, así nace con los valores correctos. */}
-      <Formulario key={`${tipo}:${objetivo?.id ?? 'nuevo'}`} tipo={tipo} objetivo={objetivo} />
+      {/* La clave solo lleva el tipo de día: remontar también al cambiar el
+          objetivo borraría el aviso de "Guardado" justo al guardarlo, porque la
+          fila recién escrita entra en la consulta al instante. */}
+      <Formulario key={tipo} tipo={tipo} objetivo={objetivo} />
     </Tarjeta>
   )
 }
+
+type Campos = { kcal: string; proteina_g: string; grasa_g: string; carbos_g: string }
 
 function Formulario({
   tipo,
@@ -46,16 +49,26 @@ function Formulario({
   tipo: TipoDia
   objetivo: ObjetivoNutricional | undefined
 }) {
-  const [campos, setCampos] = useState(() => ({
-    kcal: aTexto(objetivo?.kcal),
-    proteina_g: aTexto(objetivo?.proteina_g),
-    grasa_g: aTexto(objetivo?.grasa_g),
-    carbos_g: aTexto(objetivo?.carbos_g),
-  }))
+  // Lo tecleado se guarda aparte del objetivo vigente, con `null` para "aquí no
+  // ha tocado nadie": el objetivo puede llegar de una descarga en cualquier
+  // momento y no puede pisar lo que se esté escribiendo.
+  const [tecleado, setTecleado] = useState<Record<keyof Campos, string | null>>({
+    kcal: null,
+    proteina_g: null,
+    grasa_g: null,
+    carbos_g: null,
+  })
   const [guardado, setGuardado] = useState(false)
 
-  const poner = (clave: keyof typeof campos) => (e: { target: { value: string } }) => {
-    setCampos((c) => ({ ...c, [clave]: e.target.value }))
+  const campos: Campos = {
+    kcal: tecleado.kcal ?? aTexto(objetivo?.kcal),
+    proteina_g: tecleado.proteina_g ?? aTexto(objetivo?.proteina_g),
+    grasa_g: tecleado.grasa_g ?? aTexto(objetivo?.grasa_g),
+    carbos_g: tecleado.carbos_g ?? aTexto(objetivo?.carbos_g),
+  }
+
+  const poner = (clave: keyof Campos) => (e: { target: { value: string } }) => {
+    setTecleado((c) => ({ ...c, [clave]: e.target.value }))
     setGuardado(false)
   }
 

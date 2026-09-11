@@ -22,7 +22,7 @@ export default function Cabecera() {
 
   return (
     <header className="sticky top-0 z-10 border-b border-borde bg-fondo/85 pt-[env(safe-area-inset-top)] backdrop-blur">
-      <div className="flex h-14 items-center justify-between px-4">
+      <div className="mx-auto flex h-14 w-full max-w-lg items-center justify-between px-4">
         <div className="flex min-w-0 items-center gap-1">
           {esSubpantalla && (
             <button

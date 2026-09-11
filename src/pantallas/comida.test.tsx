@@ -143,6 +143,32 @@ describe('pantalla Comida', () => {
     expect(await screen.findByRole('button', { name: 'Añadir' })).toBeDefined()
   })
 
+  it('corrige una ficha ya creada y vuelve a la cantidad', async () => {
+    const usuario = userEvent.setup()
+    pintar()
+    await usuario.click(await screen.findByText('Pechuga de pollo'))
+
+    await usuario.click(await screen.findByRole('button', { name: 'Editar ficha' }))
+
+    const grasa = (await screen.findByLabelText('Grasa')) as HTMLInputElement
+    expect(grasa.value).toBe('3,6')
+    await usuario.clear(grasa)
+    await usuario.type(grasa, '4,2')
+    await usuario.click(screen.getByRole('button', { name: 'Guardar alimento' }))
+
+    await waitFor(async () =>
+      expect((await db.alimentos.get(pollo.id))?.grasa_100g).toBe(4.2),
+    )
+    // Corregir no reinicia el contador de uso ni pierde lo demás.
+    expect(await db.alimentos.get(pollo.id)).toMatchObject({
+      veces_usado: 3,
+      nombre: 'Pechuga de pollo',
+      porcion_defecto_g: 150,
+    })
+    // Y se vuelve a la cantidad, que es de donde se venía.
+    expect(await screen.findByRole('button', { name: 'Añadir' })).toBeDefined()
+  })
+
   it('avisa si los macros no cuadran con las kcal', async () => {
     const usuario = userEvent.setup()
     pintar()
