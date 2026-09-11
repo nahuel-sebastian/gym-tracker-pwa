@@ -1,4 +1,5 @@
 import { Suspense, lazy, useMemo, useState } from 'react'
+import { Link } from 'react-router'
 import { Segmentado, Tarjeta } from '../componentes/Formulario'
 import {
   useCatalogo,
@@ -120,6 +121,19 @@ export default function Progreso() {
           Series efectivas del periodo. El calentamiento no cuenta.
         </p>
         <VolumenGrupos datos={volumenPorGrupo(series, sesiones, catalogo, desde, hoy)} />
+      </Tarjeta>
+
+      <Tarjeta>
+        <h2 className="text-base font-semibold">Fotos de progreso</h2>
+        <p className="mb-3 mt-1 text-sm text-tenue">
+          Lo que la báscula no dice. Mismo ángulo, misma luz, y comparar meses, no días.
+        </p>
+        <Link
+          to="/progreso/fotos"
+          className="flex min-h-12 items-center justify-center rounded-xl border border-borde font-medium active:bg-fondo"
+        >
+          Ver las fotos
+        </Link>
       </Tarjeta>
     </div>
   )

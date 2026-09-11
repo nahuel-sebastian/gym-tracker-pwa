@@ -5,8 +5,9 @@ import HojaAlimento from '../componentes/HojaAlimento'
 import HojaAnadirAlimento from '../componentes/HojaAnadirAlimento'
 import HojaEscanear from '../componentes/HojaEscanear'
 import { duplicarDia } from '../lib/acciones'
+import { registrarReceta } from '../lib/recetas'
 import { db } from '../lib/db'
-import { useAlimentos, useHoy } from '../lib/consultas'
+import { useAlimentos, useHoy, useRecetas } from '../lib/consultas'
 import { formatoRelativo, sumarDias } from '../lib/fechas'
 import { NOMBRE_MOMENTO, momentoSugerido } from '../lib/momentos'
 import { formatoKcal, formatoNumero } from '../lib/numeros'
@@ -101,6 +102,8 @@ export default function Comida() {
         </Boton>
       </div>
 
+      <TarjetaRecetas fecha={fecha} momento={momento} />
+
       <Tarjeta>
         <h2 className="text-base font-semibold">Importar macros</h2>
         <p className="mb-3 mt-1 text-sm text-tenue">
@@ -115,20 +118,6 @@ export default function Comida() {
       </Tarjeta>
 
       <DuplicarDia fecha={fecha} />
-
-      <Tarjeta>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-tenue">
-          Pendiente en esta pantalla
-        </h3>
-        <ul className="mt-2 space-y-1.5 text-sm">
-          {['Recetas y comidas guardadas de un toque'].map((linea) => (
-            <li key={linea} className="flex gap-2">
-              <span className="text-tenue">·</span>
-              {linea}
-            </li>
-          ))}
-        </ul>
-      </Tarjeta>
 
       {aAnadir && (
         <HojaAnadirAlimento
@@ -181,6 +170,54 @@ export default function Comida() {
         />
       )}
     </div>
+  )
+}
+
+/**
+ * Las recetas, registrables de un toque: una porción en el momento que toca.
+ * Es el atajo para lo que se come siempre igual.
+ */
+function TarjetaRecetas({ fecha, momento }: { fecha: string; momento: Momento }) {
+  const recetas = useRecetas()
+  const [hecha, setHecha] = useState<string | null>(null)
+
+  async function registrar(receta: (typeof recetas)[number]) {
+    await registrarReceta(fecha, momento, receta)
+    setHecha(receta.id)
+    setTimeout(() => setHecha(null), 1800)
+  }
+
+  return (
+    <Tarjeta className="!p-0">
+      <div className="flex items-baseline justify-between px-4 pb-2 pt-3">
+        <h2 className="text-base font-semibold">Recetas</h2>
+        <Link to="/comida/recetas" className="text-sm font-medium text-acento">
+          Gestionar
+        </Link>
+      </div>
+
+      {recetas.length === 0 ? (
+        <p className="px-4 pb-4 text-sm text-tenue">
+          Define una receta y podrás registrarla de un toque.
+        </p>
+      ) : (
+        <ul className="divide-y divide-borde border-t border-borde">
+          {recetas.slice(0, 6).map((r) => (
+            <li key={r.id}>
+              <button
+                onClick={() => void registrar(r)}
+                className="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-2 text-left active:bg-fondo"
+              >
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">{r.nombre}</span>
+                <span className="shrink-0 text-sm text-acento">
+                  {hecha === r.id ? 'Añadida' : '+ 1 porción'}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Tarjeta>
   )
 }
 

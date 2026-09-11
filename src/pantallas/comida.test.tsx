@@ -184,6 +184,33 @@ describe('pantalla Comida', () => {
     expect(await screen.findByText(/Revísalo antes de guardar/)).toBeDefined()
   })
 
+  it('registra una receta de un solo toque', async () => {
+    const usuario = userEvent.setup()
+    await guardarDelServidor('recetas', [
+      { id: 'r1', nombre: 'Pollo con arroz', porciones: 2, notas: null },
+    ])
+    await guardarDelServidor('receta_ingredientes', [
+      { id: 'i1', receta_id: 'r1', alimento_id: pollo.id, gramos: 400 },
+      { id: 'i2', receta_id: 'r1', alimento_id: arroz.id, gramos: 600 },
+    ])
+
+    pintar('/comida?momento=cena')
+
+    // Un toque: la receta entera, una porción, en el momento que toca.
+    await usuario.click(await screen.findByText('Pollo con arroz'))
+
+    await waitFor(async () => expect(await db.registros_comida.count()).toBe(1))
+    expect((await db.registros_comida.toArray())[0]).toMatchObject({
+      receta_id: 'r1',
+      momento: 'cena',
+      descripcion: 'Pollo con arroz',
+      // (400 g de pollo + 600 g de arroz) / 2 porciones.
+      kcal: 720,
+      gramos: 500,
+    })
+    expect(await screen.findByText('Añadida')).toBeDefined()
+  })
+
   it('duplicar el día anterior copia los macros tal como se registraron', async () => {
     const usuario = userEvent.setup()
     const ayer = new Date()

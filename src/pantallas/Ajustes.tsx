@@ -2,10 +2,10 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useState } from 'react'
 import BloqueInstrucciones from '../componentes/BloqueInstrucciones'
 import BloqueObjetivos from '../componentes/BloqueObjetivos'
-import Marcador from '../componentes/Marcador'
 import { db, type OperacionFallida } from '../lib/db'
-import { descargar } from '../lib/descarga'
+import { descargar as descargarDelServidor } from '../lib/descarga'
 import { useHoy } from '../lib/consultas'
+import { descargar, exportarTodo, nombreDeArchivo } from '../lib/exportar'
 import { useSesion } from '../lib/sesion'
 import {
   cerrarSesion,
@@ -42,11 +42,7 @@ export default function Ajustes() {
 
       <BloqueSincronizacion />
 
-      <Marcador
-        titulo="Ajustes"
-        descripcion="Objetivos nutricionales y herramientas de datos."
-        pendiente={['Exportación completa a JSON']}
-      />
+      <BloqueExportar />
     </div>
   )
 }
@@ -132,7 +128,7 @@ function BloqueSincronizacion() {
           {trabajando === 'subir' ? 'Enviando…' : 'Enviar ahora'}
         </button>
         <button
-          onClick={() => void correr('bajar', () => descargar(true))}
+          onClick={() => void correr('bajar', () => descargarDelServidor(true))}
           disabled={trabajando !== null}
           className="min-h-11 flex-1 rounded-xl border border-borde text-sm font-medium disabled:opacity-50"
         >
@@ -153,4 +149,41 @@ const ETIQUETAS: Record<string, string> = {
   pendiente: 'Reintentando',
   error: 'Con errores',
   sin_conexion: 'Sin conexión',
+}
+
+/**
+ * Exportación completa a JSON: la red de seguridad frente a cualquier problema
+ * con Supabase. Se arma desde la copia local, así que funciona sin conexión.
+ */
+function BloqueExportar() {
+  const [estado, setEstado] = useState<string | null>(null)
+
+  async function exportar() {
+    setEstado('Preparando…')
+    try {
+      const exportacion = await exportarTodo()
+      descargar(exportacion)
+      const filas = Object.values(exportacion.datos).reduce((t, f) => t + f.length, 0)
+      setEstado(`${filas} filas en ${nombreDeArchivo()}`)
+    } catch {
+      setEstado('No he podido generar el archivo.')
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border border-borde bg-superficie p-4">
+      <h2 className="text-base font-semibold">Exportar mis datos</h2>
+      <p className="mb-3 mt-1 text-sm text-tenue">
+        Un JSON con todo lo registrado, legible sin la app y sin la base de datos.
+        Se genera desde la copia local, así que funciona sin conexión.
+      </p>
+      <button
+        onClick={() => void exportar()}
+        className="min-h-12 w-full rounded-xl border border-borde font-medium active:bg-fondo"
+      >
+        Descargar JSON
+      </button>
+      {estado && <p className="mt-2 text-sm text-tenue">{estado}</p>}
+    </section>
+  )
 }

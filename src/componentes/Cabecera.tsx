@@ -11,6 +11,8 @@ const titulos: Record<string, string> = {
   '/entreno/rutinas': 'Rutinas',
   '/entreno/catalogo': 'Ejercicios',
   '/comida/importar': 'Importar macros',
+  '/comida/recetas': 'Recetas',
+  '/progreso/fotos': 'Fotos de progreso',
 }
 
 export default function Cabecera() {
@@ -19,7 +21,10 @@ export default function Cabecera() {
 
   // Las subpantallas de Entreno no tienen pestaña propia: necesitan volver.
   const esSubpantalla =
-    pathname.startsWith('/entreno/') || pathname.startsWith('/comida/') || pathname === '/ajustes'
+    pathname.startsWith('/entreno/') ||
+    pathname.startsWith('/comida/') ||
+    pathname.startsWith('/progreso/') ||
+    pathname === '/ajustes'
   const titulo = titulos[pathname] ?? (pathname.startsWith('/entreno/sesion/') ? 'Sesión' : 'Hoy')
 
   return (

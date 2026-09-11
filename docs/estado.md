@@ -184,7 +184,7 @@ Decisiones de esta fase:
 `npm test` (vitest). Los de lógica corren sobre `fake-indexeddb`, así que
 ejercitan Dexie de verdad —transacciones e índices compuestos—, y los de
 pantalla montan el componente entero en jsdom contra esa misma base.
-**121 pruebas**, todas en verde:
+**175 pruebas**, todas en verde:
 
 - `src/lib/datos.test.ts` — fusión de cola, cancelación de envíos, cascadas,
   referencias a null, la descarga que no pisa lo pendiente.
@@ -208,6 +208,16 @@ pantalla montan el componente entero en jsdom contra esa misma base.
   dividida por días registrados, el calentamiento fuera del volumen.
 - `src/componentes/graficas/` — las marcas redondas del eje y el contenido de
   los cuatro tooltips.
+- `src/lib/estimacion.test.ts` — el parser del JSON de macros: lo que acepta al
+  pegar de un chat y lo que tiene que rechazar con un mensaje concreto.
+- `src/lib/openfoodfacts.test.ts` — los cuatro finales, los kilojulios, la ficha
+  sin macros que no se guarda.
+- `src/lib/codigoBarras.test.ts` — la biblioteca propia por delante de la API.
+- `src/lib/recetas.test.ts` — macros por porción y el registro que no cambia al
+  cambiar la receta.
+- `src/lib/exportar.test.ts` — las catorce tablas, también las vacías.
+- `src/pantallas/importar.test.tsx` — el puente de punta a punta: pegar,
+  corregir, confirmar, y las fichas por 100 g en la biblioteca.
 
 ### Fase 5 — Progreso
 
@@ -255,6 +265,60 @@ Decisiones de esta fase:
 **Sin comprobar**: el hover de las gráficas. Recharts no responde a eventos de
 ratón sintéticos, así que la automatización del navegador no puede dispararlo;
 lo que sí está cubierto por tests es qué enseña cada tooltip al activarse.
+
+### Fase 6 — Extras
+
+| Archivo | Papel |
+|---|---|
+| `src/lib/estimacion.ts` | Capa `estimarMacros`, parser del JSON y las instrucciones para Claude |
+| `src/lib/openfoodfacts.ts` | Ficha por código de barras |
+| `src/lib/codigoBarras.ts` | Qué hacer con un código leído |
+| `src/lib/recetas.ts` | Macros de receta y por porción, registro de porciones |
+| `src/lib/fotos.ts` | Redimensionado, subida al bucket privado, URL firmada |
+| `src/lib/exportar.ts` | Exportación completa a JSON |
+| `src/componentes/Escaner.tsx` | ZXing, cargado aparte |
+| `src/pantallas/Importar.tsx` | Pegar el JSON, vista previa editable, confirmar |
+| `src/pantallas/Recetas.tsx` | Definir recetas con sus ingredientes |
+| `src/pantallas/Fotos.tsx` | Galería y comparación entre dos fechas |
+
+Decisiones de esta fase:
+
+- **La capa de estimación existe con una sola implementación.** `estimarMacros`
+  recibe una entrada genérica (hoy texto, mañana quizá un `Blob`) y devuelve
+  siempre lo mismo, para que contratar una API de visión sea escribir otra
+  implementación y no reescribir la pantalla.
+- **El parser es tolerante con la forma y estricto con los datos.** Acepta
+  vallas de markdown, listas sueltas y números como texto con coma, porque eso
+  es lo que llega al pegar desde un chat. Pero un macro que falta **falla**: ese
+  cero silencioso descuadra el día y no se nota hasta que no cuadra la semana.
+- **Las instrucciones para Claude viven junto al parser**, en el mismo archivo:
+  las dos mitades del puente tienen que cambiar a la vez.
+- **Entre pegar y guardar hay una vista previa editable.** Lo que llega es una
+  estimación de un modelo, no una medida.
+- **La biblioteca propia manda sobre Open Food Facts.** Se consulta antes, así
+  que una ficha corregida a mano no se pisa y el escáner sirve sin cobertura
+  para lo que se compra siempre.
+- **Sin los cuatro macros no se guarda ficha.** Un alimento a ceros sería falso
+  en la biblioteca y en todos los registros que lo usen. Se pide completarlo.
+- **Open Food Facts distingue cuatro finales** —no está, incompleto, sin red,
+  encontrado— porque la interfaz hace algo distinto en cada uno. Y convierte los
+  kilojulios, que es lo único que trae mucha etiqueta europea.
+- **El escáner solo busca EAN y UPC.** Añadir códigos 2D lo hace más lento y más
+  propenso a leer cualquier otra cosa del envase. Siempre deja teclear el código.
+- **Los macros de una receta se recalculan; el registro que sale de ella, no.**
+  Una receta es una definición viva; lo comido ayer no cambia.
+- **Las fotos son lo único que necesita conexión.** La cola guarda filas, no
+  archivos: acumular fotos en IndexedDB llenaría el teléfono y es justo lo que
+  iOS desaloja. La fila se crea después de que la imagen esté arriba, así que
+  nunca hay una foto en el histórico que no se pueda abrir. Al borrar, primero
+  el archivo: el único fallo posible es un huérfano que nadie ve.
+- **La exportación se arma desde la copia local**, no desde el servidor, así que
+  también funciona sin conexión, y dice cuántos cambios quedaban sin enviar.
+
+**Sin comprobar en esta fase**: el escáner con una cámara real, la subida de una
+foto al bucket, y la descarga del JSON en Safari. Las tres piezas tienen su
+lógica cubierta por tests, pero el navegador no se ha podido abrir en esta
+sesión (la extensión de Chrome estaba desconectada).
 
 ### Repaso en el navegador
 
@@ -376,19 +440,20 @@ Añadidos y correcciones respecto a `docs/plan.md`, con su motivo:
 
 ## Siguiente paso
 
-**Fase 6 — Extras**, lo único que queda del plan:
+**El plan está entregado completo.** Las seis fases, con todo lo que pedía
+`docs/plan.md` y nada de lo que dejaba fuera del alcance.
 
-- Escáner de código de barras y Open Food Facts.
-- Importar el JSON del puente manual de macros, con vista previa editable, y el
-  bloque de instrucciones copiables en Ajustes.
-- Fotos de progreso: redimensionado en el cliente, subida al bucket privado,
-  galería y comparación entre dos fechas.
-- Exportación completa a JSON desde Ajustes.
-- Recetas y comidas guardadas de un toque (quedó pendiente de la fase 2).
+Lo que queda no es plan, es rodaje:
 
-Y la capa `estimarMacros(entrada)` que pide el plan: una interfaz con una sola
-implementación de puente manual, para que cambiar a una API de visión sea
-cambiar de implementación y no reescribir.
+1. **Mirarlo en un iPhone de verdad.** Instalarlo desde Safari, comprobar el
+   tema oscuro, los teclados numéricos, el `safe-area` y que el escáner enfoca.
+   Nada de eso se puede verificar desde aquí.
+2. **Probar el escáner con un envase real** y la subida de una foto al bucket.
+3. **Poner el proyecto de producción** (ver abajo) y hacer un ciclo completo
+   contra él: registrar sin cobertura, recuperar red, comprobar que la cola se
+   vacía.
+4. **Quitar los datos de demo** de la base local: `node scripts/datos-demo.mjs
+   --borrar`.
 
 ## Pendiente de tu parte
 

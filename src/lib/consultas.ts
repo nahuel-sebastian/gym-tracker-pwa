@@ -4,12 +4,14 @@ import { db } from './db'
 import { hoy } from './fechas'
 import { ultimaVez, type UltimaVez } from './entreno'
 import { sumarMacros, type Macros } from './nutricion'
+import { ingredientesDe, type IngredienteConFicha } from './recetas'
 import type {
   Alimento,
   Dia,
   Ejercicio,
   MedidaCorporal,
   ObjetivoNutricional,
+  Receta,
   RegistroComida,
   Rutina,
   RutinaDia,
@@ -158,6 +160,29 @@ export function useDiasDeRutina(rutinaId: string | undefined): RutinaDia[] {
 
 export function useSesionesDelDia(fecha: string): Sesion[] {
   return useLiveQuery(() => db.sesiones.where('fecha').equals(fecha).toArray(), [fecha]) ?? []
+}
+
+export function useRecetas(): Receta[] {
+  return (
+    useLiveQuery(async () => {
+      const recetas = await db.recetas.toArray()
+      return recetas.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+    }) ?? []
+  )
+}
+
+export function useReceta(id: string | undefined): Receta | undefined {
+  return useLiveQuery(() => (id ? db.recetas.get(id) : undefined), [id])
+}
+
+/** Los ingredientes de una receta, cada uno con su ficha ya resuelta. */
+export function useIngredientes(recetaId: string | undefined): IngredienteConFicha[] {
+  return (
+    useLiveQuery(
+      () => (recetaId ? ingredientesDe(recetaId) : Promise.resolve([] as IngredienteConFicha[])),
+      [recetaId],
+    ) ?? []
+  )
 }
 
 // -----------------------------------------------------------------------------

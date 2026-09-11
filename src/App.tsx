@@ -7,11 +7,13 @@ import { useSesion } from './lib/sesion'
 import Ajustes from './pantallas/Ajustes'
 import Catalogo from './pantallas/Catalogo'
 import Comida from './pantallas/Comida'
+import Fotos from './pantallas/Fotos'
 import Entreno from './pantallas/Entreno'
 import Hoy from './pantallas/Hoy'
 import Importar from './pantallas/Importar'
 import Login from './pantallas/Login'
 import Progreso from './pantallas/Progreso'
+import Recetas from './pantallas/Recetas'
 import Rutinas from './pantallas/Rutinas'
 import Sesion from './pantallas/Sesion'
 
@@ -52,11 +54,13 @@ export default function App() {
           <Route path="/" element={<Hoy />} />
           <Route path="/comida" element={<Comida />} />
           <Route path="/comida/importar" element={<Importar />} />
+          <Route path="/comida/recetas" element={<Recetas />} />
           <Route path="/entreno" element={<Entreno />} />
           <Route path="/entreno/sesion/:id" element={<Sesion />} />
           <Route path="/entreno/rutinas" element={<Rutinas />} />
           <Route path="/entreno/catalogo" element={<Catalogo />} />
           <Route path="/progreso" element={<Progreso />} />
+          <Route path="/progreso/fotos" element={<Fotos />} />
           <Route path="/ajustes" element={<Ajustes />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
