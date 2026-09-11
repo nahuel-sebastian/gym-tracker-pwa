@@ -9,6 +9,7 @@ import Catalogo from './pantallas/Catalogo'
 import Comida from './pantallas/Comida'
 import Entreno from './pantallas/Entreno'
 import Hoy from './pantallas/Hoy'
+import Importar from './pantallas/Importar'
 import Login from './pantallas/Login'
 import Progreso from './pantallas/Progreso'
 import Rutinas from './pantallas/Rutinas'
@@ -50,6 +51,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Hoy />} />
           <Route path="/comida" element={<Comida />} />
+          <Route path="/comida/importar" element={<Importar />} />
           <Route path="/entreno" element={<Entreno />} />
           <Route path="/entreno/sesion/:id" element={<Sesion />} />
           <Route path="/entreno/rutinas" element={<Rutinas />} />

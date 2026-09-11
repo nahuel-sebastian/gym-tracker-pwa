@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useState } from 'react'
+import BloqueInstrucciones from '../componentes/BloqueInstrucciones'
 import BloqueObjetivos from '../componentes/BloqueObjetivos'
 import Marcador from '../componentes/Marcador'
 import { db, type OperacionFallida } from '../lib/db'
@@ -37,15 +38,14 @@ export default function Ajustes() {
 
       <BloqueObjetivos fecha={fecha} />
 
+      <BloqueInstrucciones />
+
       <BloqueSincronizacion />
 
       <Marcador
         titulo="Ajustes"
         descripcion="Objetivos nutricionales y herramientas de datos."
-        pendiente={[
-          'Instrucciones copiables para el puente manual de macros',
-          'Exportación completa a JSON',
-        ]}
+        pendiente={['Exportación completa a JSON']}
       />
     </div>
   )

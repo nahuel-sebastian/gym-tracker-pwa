@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { useSearchParams } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { Boton, Tarjeta } from '../componentes/Formulario'
 import HojaAlimento from '../componentes/HojaAlimento'
 import HojaAnadirAlimento from '../componentes/HojaAnadirAlimento'
+import HojaEscanear from '../componentes/HojaEscanear'
 import { duplicarDia } from '../lib/acciones'
 import { db } from '../lib/db'
 import { useAlimentos, useHoy } from '../lib/consultas'
@@ -27,6 +28,8 @@ export default function Comida() {
   const [aAnadir, setAAnadir] = useState<Alimento | null>(null)
   const [creando, setCreando] = useState(false)
   const [editando, setEditando] = useState<Alimento | null>(null)
+  const [escaneando, setEscaneando] = useState(false)
+  const [codigoAMano, setCodigoAMano] = useState<{ codigo: string; nombre: string } | null>(null)
 
   /** Tras crear o corregir una ficha se vuelve a la cantidad, sin buscarla otra vez. */
   async function trasCrear(id: string) {
@@ -89,9 +92,27 @@ export default function Comida() {
         </Tarjeta>
       )}
 
-      <Boton onClick={() => setCreando(true)}>
-        {busqueda.trim() ? `Crear «${busqueda.trim()}»` : 'Nuevo alimento'}
-      </Boton>
+      <div className="flex gap-2">
+        <Boton variante="secundario" onClick={() => setEscaneando(true)}>
+          Escanear
+        </Boton>
+        <Boton onClick={() => setCreando(true)}>
+          {busqueda.trim() ? `Crear «${busqueda.trim()}»` : 'Nuevo alimento'}
+        </Boton>
+      </div>
+
+      <Tarjeta>
+        <h2 className="text-base font-semibold">Importar macros</h2>
+        <p className="mb-3 mt-1 text-sm text-tenue">
+          Pega el JSON que te devuelve Claude al analizar la foto de un plato.
+        </p>
+        <Link
+          to="/comida/importar"
+          className="flex min-h-12 items-center justify-center rounded-xl border border-borde font-medium active:bg-fondo"
+        >
+          Pegar un JSON
+        </Link>
+      </Tarjeta>
 
       <DuplicarDia fecha={fecha} />
 
@@ -100,11 +121,7 @@ export default function Comida() {
           Pendiente en esta pantalla
         </h3>
         <ul className="mt-2 space-y-1.5 text-sm">
-          {[
-            'Escáner de código de barras y Open Food Facts',
-            'Recetas y comidas guardadas de un toque',
-            'Importar el JSON del puente manual de macros',
-          ].map((linea) => (
+          {['Recetas y comidas guardadas de un toque'].map((linea) => (
             <li key={linea} className="flex gap-2">
               <span className="text-tenue">·</span>
               {linea}
@@ -130,8 +147,28 @@ export default function Comida() {
       {creando && (
         <HojaAlimento
           nombreInicial={busqueda.trim()}
-          onCerrar={() => setCreando(false)}
+          codigoInicial={codigoAMano?.codigo}
+          onCerrar={() => {
+            setCreando(false)
+            setCodigoAMano(null)
+          }}
           onGuardado={(id) => void trasCrear(id)}
+        />
+      )}
+
+      {escaneando && (
+        <HojaEscanear
+          onAlimento={(a) => {
+            setEscaneando(false)
+            setAAnadir(a)
+          }}
+          onAMano={(codigo, nombre) => {
+            setEscaneando(false)
+            setCodigoAMano({ codigo, nombre })
+            setBusqueda(nombre)
+            setCreando(true)
+          }}
+          onCerrar={() => setEscaneando(false)}
         />
       )}
 

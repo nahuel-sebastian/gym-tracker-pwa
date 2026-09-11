@@ -1,5 +1,6 @@
 import { borrar, guardar } from './datos'
 import { db } from './db'
+import type { AlimentoEstimado } from './estimacion'
 import { hoy } from './fechas'
 import { macrosDeAlimento, type Macros } from './nutricion'
 import type { Alimento, Momento, RegistroComida, TipoDia } from './tipos'
@@ -203,4 +204,63 @@ export async function guardarAlimento(
       }
 
   return guardar('alimentos', { ...porDefecto, ...datos, id })
+}
+
+/**
+ * Guarda lo que llega del puente manual de macros.
+ *
+ * Los macros vienen ya calculados para la cantidad servida, así que se escriben
+ * tal cual: no se recalculan desde ninguna ficha.
+ *
+ * Con `aBiblioteca` se crea además una ficha por alimento, con los valores
+ * llevados a 100 g. Eso **solo se puede hacer si el alimento trae gramos**: sin
+ * el peso servido no hay forma de saber a cuánto equivalen esas kcal por cada
+ * cien. Los que no lo traen se registran igual, pero sueltos.
+ */
+export async function registrarImportado(
+  fecha: string,
+  momento: Momento,
+  alimentos: AlimentoEstimado[],
+  aBiblioteca = false,
+): Promise<{ registrados: number; enBiblioteca: number }> {
+  let enBiblioteca = 0
+
+  for (const a of alimentos) {
+    let alimento_id: string | null = null
+
+    if (aBiblioteca && a.gramos && a.gramos > 0) {
+      const factor = 100 / a.gramos
+      alimento_id = await guardarAlimento({
+        nombre: a.nombre,
+        kcal_100g: redondearDos(a.kcal * factor),
+        proteina_100g: redondearDos(a.proteina * factor),
+        grasa_100g: redondearDos(a.grasa * factor),
+        carbos_100g: redondearDos(a.carbos * factor),
+        porcion_defecto_g: a.gramos,
+        origen: 'importado',
+      })
+      enBiblioteca++
+    }
+
+    await guardar('registros_comida', {
+      fecha,
+      momento,
+      alimento_id,
+      receta_id: null,
+      // La descripción se guarda siempre, también con ficha: si un día se borra
+      // el alimento de la biblioteca, el registro sigue diciendo qué se comió.
+      descripcion: a.nombre,
+      gramos: a.gramos,
+      kcal: a.kcal,
+      proteina: a.proteina,
+      grasa: a.grasa,
+      carbos: a.carbos,
+    })
+  }
+
+  return { registrados: alimentos.length, enBiblioteca }
+}
+
+function redondearDos(n: number): number {
+  return Math.round(n * 100) / 100
 }

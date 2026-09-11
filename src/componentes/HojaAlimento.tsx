@@ -11,6 +11,8 @@ type Props = {
   alimento?: Alimento
   /** Nombre con el que precargar el formulario, de lo que se estaba buscando. */
   nombreInicial?: string
+  /** Código recién escaneado, para no tener que teclearlo. */
+  codigoInicial?: string
   onCerrar: () => void
   onGuardado?: (id: string) => void
 }
@@ -33,6 +35,7 @@ const VACIO = {
 export default function HojaAlimento({
   alimento,
   nombreInicial = '',
+  codigoInicial = '',
   onCerrar,
   onGuardado,
 }: Props) {
@@ -48,7 +51,7 @@ export default function HojaAlimento({
           porcion_defecto_g: aTexto(alimento.porcion_defecto_g),
           codigo_barras: alimento.codigo_barras ?? '',
         }
-      : { ...VACIO, nombre: nombreInicial },
+      : { ...VACIO, nombre: nombreInicial, codigo_barras: codigoInicial },
   )
   const [guardando, setGuardando] = useState(false)
 
