@@ -459,17 +459,35 @@ Lo que queda no es plan, es rodaje:
 
 Crear el proyecto real en supabase.com. Hasta entonces todo corre en local.
 
-1. Proyecto nuevo, región cercana (`eu-west` desde España). Guarda la
+1. **Proyecto nuevo**, región cercana (`eu-west` desde España). Guarda la
    contraseña de la base de datos.
 2. **Authentication → Users → Add user** con tu email y contraseña, marcando
    "Auto Confirm User". No habrá pantalla de registro.
-3. **SQL Editor**: pegar y ejecutar las cinco migraciones **en orden**.
-   `0005` tiene que ir después de crear la cuenta del paso 2; si no, avisa de
-   que no hay usuario y no siembra nada. Es idempotente, se puede repetir.
-4. **Project Settings → API**: copiar `Project URL` y la clave `anon public` a
-   un `.env.production.local`, dejando `.env.local` apuntando a la base local.
+3. **SQL Editor**: pegar `docs/produccion.sql` entero y ejecutar. Son las cinco
+   migraciones concatenadas en orden; se regenera con:
 
----
+   ```bash
+   for f in supabase/migrations/*.sql; do echo; cat "$f"; done > docs/produccion.sql
+   ```
+
+   Tiene que ir **después** del paso 2: la última parte siembra el catálogo a
+   nombre de la cuenta y, si no existe, avisa y no siembra.
+4. **Project Settings → API**: copiar `Project URL` y la clave `anon public` a
+   `.env.production.local` (hay plantilla en `.env.production.local.example`).
+   Ese archivo solo lo lee `npm run build`; `npm run dev` sigue apuntando a la
+   base local.
+5. Si despliegas en Vercel o Cloudflare Pages, las dos variables hay que
+   meterlas **además** en el panel del host: el archivo está en `.gitignore` y
+   no viaja con el repositorio.
+
+Comprobaciones después de cada paso, en `docs/produccion.sql`:
+
+- Tras el paso 3, en **Table Editor** deben salir 14 tablas y `ejercicios` con
+  70 filas. Si sale 0, el paso 2 no se había hecho: vuelve a ejecutar.
+- En **Storage** debe existir el bucket `fotos`, privado.
+- Si la parte del bucket falla por permisos, créalo desde **Storage → New
+  bucket** (privado, 5 MB, `image/jpeg` e `image/webp`) y vuelve a ejecutar solo
+  esa parte.
 
 ## Cosas que quedaron abiertas
 
