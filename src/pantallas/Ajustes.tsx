@@ -6,7 +6,7 @@ import { db, type OperacionFallida } from '../lib/db'
 import { descargar as descargarDelServidor } from '../lib/descarga'
 import { useHoy } from '../lib/consultas'
 import { descargar, exportarTodo, nombreDeArchivo } from '../lib/exportar'
-import { useSesion } from '../lib/sesion'
+import { useSesion } from '../lib/useSesion'
 import {
   cerrarSesion,
   descartarFallidas,

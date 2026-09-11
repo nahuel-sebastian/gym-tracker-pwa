@@ -1,25 +1,9 @@
 import type { Session } from '@supabase/supabase-js'
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { supabase } from './supabase'
+import { ContextoSesion } from './useSesion'
 
-type EstadoSesion = {
-  sesion: Session | null
-  cargando: boolean
-}
-
-const ContextoSesion = createContext<EstadoSesion>({
-  sesion: null,
-  cargando: true,
-})
-
-export function ProveedorSesion({ children }: { children: ReactNode }) {
+export default function ProveedorSesion({ children }: { children: ReactNode }) {
   const [sesion, setSesion] = useState<Session | null>(null)
   const [cargando, setCargando] = useState(true)
 
@@ -42,8 +26,4 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   const valor = useMemo(() => ({ sesion, cargando }), [sesion, cargando])
 
   return <ContextoSesion value={valor}>{children}</ContextoSesion>
-}
-
-export function useSesion() {
-  return useContext(ContextoSesion)
 }

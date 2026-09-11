@@ -452,8 +452,8 @@ Lo que queda no es plan, es rodaje:
 3. **Poner el proyecto de producción** (ver abajo) y hacer un ciclo completo
    contra él: registrar sin cobertura, recuperar red, comprobar que la cola se
    vacía.
-4. **Quitar los datos de demo** de la base local: `node scripts/datos-demo.mjs
-   --borrar`.
+4. Los datos de demo de la base local ya están borrados. Para volver a
+   sembrarlos: `node scripts/datos-demo.mjs`.
 
 ## Pendiente de tu parte
 
