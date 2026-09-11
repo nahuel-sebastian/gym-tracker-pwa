@@ -5,11 +5,14 @@ import Cabecera from './componentes/Cabecera'
 import { arrancarSincronizacion } from './lib/sincronizacion'
 import { useSesion } from './lib/sesion'
 import Ajustes from './pantallas/Ajustes'
+import Catalogo from './pantallas/Catalogo'
 import Comida from './pantallas/Comida'
 import Entreno from './pantallas/Entreno'
 import Hoy from './pantallas/Hoy'
 import Login from './pantallas/Login'
 import Progreso from './pantallas/Progreso'
+import Rutinas from './pantallas/Rutinas'
+import Sesion from './pantallas/Sesion'
 
 export default function App() {
   const { sesion, cargando } = useSesion()
@@ -45,6 +48,9 @@ export default function App() {
           <Route path="/" element={<Hoy />} />
           <Route path="/comida" element={<Comida />} />
           <Route path="/entreno" element={<Entreno />} />
+          <Route path="/entreno/sesion/:id" element={<Sesion />} />
+          <Route path="/entreno/rutinas" element={<Rutinas />} />
+          <Route path="/entreno/catalogo" element={<Catalogo />} />
           <Route path="/progreso" element={<Progreso />} />
           <Route path="/ajustes" element={<Ajustes />} />
           <Route path="*" element={<Navigate to="/" replace />} />

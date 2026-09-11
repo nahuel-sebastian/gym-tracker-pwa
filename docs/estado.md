@@ -144,12 +144,47 @@ Decisiones de esta fase:
 - **Guardar un objetivo no sobrescribe el anterior**: crea una vigencia nueva
   desde hoy.
 
+### Fase 3 — Entreno
+
+| Archivo | Papel |
+|---|---|
+| `src/lib/entreno.ts` | "Última vez", propuesta de la siguiente serie, volumen, Epley |
+| `src/lib/rutinas.ts` | Sesiones, series, rutinas, días y catálogo |
+| `src/pantallas/Entreno.tsx` | Empezar el día que toca, seguir lo que está a medias, historial |
+| `src/pantallas/Sesion.tsx` | La sesión en curso |
+| `src/pantallas/Rutinas.tsx` | Crear rutinas, montar días y ejercicios, activar |
+| `src/pantallas/Catalogo.tsx` | Catálogo editable, con archivado |
+
+Decisiones de esta fase:
+
+- **"Última vez" se resuelve en local, no con `ultimas_series()`.** El gimnasio
+  es un sótano sin cobertura y esa llamada no llegaría; como la base local es
+  una copia completa del histórico, la misma consulta se responde sin red. La
+  función SQL se queda en las migraciones por si hiciera falta desde fuera.
+- **La siguiente serie se propone con lo último hecho hoy**, y solo si no hay
+  nada hoy se mira la serie del mismo número de la última vez. Si la primera
+  salió a 82,5 la segunda va igual, aunque la semana pasada fuera a 80.
+- **Un ejercicio nunca hecho se propone vacío, no a cero.** Cero es un peso
+  registrado; vacío es "dímelo tú".
+- **Lo tecleado se guarda aparte de la propuesta**, con `null` para "aquí no ha
+  tocado nadie". La propuesta llega un instante después del primer pintado y no
+  puede pisar lo que ya se haya escrito.
+- **Las series se numeran por ejercicio**, no por sesión.
+- **`activarRutina` desactiva primero y activa después.** No es cosmético: el
+  índice único parcial del servidor solo admite una rutina activa, y activar
+  antes de desactivar daría un 23505, que la capa clasifica como definitivo y
+  mandaría la rutina a la cola de fallidas. Que funcione sin conexión depende
+  de que la cola respete el orden de encolado. Verificado contra la base real.
+- **`hora_inicio` y `hora_fin` sí usan `toISOString()`**: son instantes
+  (`timestamptz`). La regla de calcular en hora local es para las columnas
+  `date`, que representan un día del calendario.
+
 ### Pruebas automatizadas
 
 `npm test` (vitest). Los de lógica corren sobre `fake-indexeddb`, así que
 ejercitan Dexie de verdad —transacciones e índices compuestos—, y los de
 pantalla montan el componente entero en jsdom contra esa misma base.
-**71 pruebas**, todas en verde:
+**91 pruebas**, todas en verde:
 
 - `src/lib/datos.test.ts` — fusión de cola, cancelación de envíos, cascadas,
   referencias a null, la descarga que no pisa lo pendiente.
@@ -165,6 +200,10 @@ pantalla montan el componente entero en jsdom contra esa misma base.
   de uso y las dos operaciones en la cola.
 - `src/pantallas/hoy.test.tsx` — objetivo según el tipo de día, el exceso que
   se enseña, un pesaje por día, borrar una comida.
+- `src/lib/entreno.test.ts` — la última sesión de cada ejercicio, la propuesta
+  de la siguiente serie, el calentamiento que no suma volumen.
+- `src/pantallas/sesion.test.tsx` — la sesión entera: la referencia de la última
+  vez, anotar de un toque, la numeración por ejercicio, terminar y reabrir.
 
 Errores reales que encontraron estas pruebas:
 
@@ -177,6 +216,10 @@ Errores reales que encontraron estas pruebas:
    habría perdido a los veinte minutos.
 3. El peso se enseñaba como "78,40 kg": el formateador rellenaba con ceros
    hasta los decimales pedidos en vez de tratarlos como máximo.
+4. La fila de anotar una serie se quedaba vacía: se rellenaba en el primer
+   pintado, cuando la consulta de "última vez" todavía no había resuelto. En el
+   gimnasio habría obligado a teclear peso y reps en cada serie, que es justo
+   lo que la pantalla existe para evitar.
 
 ### Pruebas contra la base de datos real
 
@@ -203,6 +246,9 @@ Y de la capa offline, con `node scripts/verificar-offline.mjs` contra el REST re
   definitivo.
 - Borrar un id inexistente **no** es un error, así que un reintento que llegue
   de más no rompe nada.
+- Activar una rutina sin desactivar la anterior devuelve `23505`; desactivar
+  primero y activar después funciona. Es el orden que sigue `activarRutina` y
+  que la cola conserva.
 
 ---
 
@@ -257,19 +303,21 @@ Añadidos y correcciones respecto a `docs/plan.md`, con su motivo:
 
 ## Siguiente paso
 
-**Fase 3 — Entreno**, que es la mitad que falta del uso diario:
+**Fase 5 — Progreso**:
 
-- Gestión de rutinas: crear, ordenar días y ejercicios, activar una.
-- Sesión en curso: filas de series con peso, reps y RIR, teclado numérico,
-  añadir un ejercicio fuera del plan, notas y sensación.
-- **"Última vez" junto a cada ejercicio**, con `ultimas_series()` precacheada
-  antes de bajar al gimnasio, y precarga de cada serie con esos valores.
-- Catálogo de ejercicios editable.
+- Peso corporal con **media móvil de 7 días** en primer plano y el dato diario
+  detrás, más tenue.
+- Progresión por ejercicio: peso máximo, volumen total o 1RM de Epley.
+- Medias semanales de calorías y macros, separadas por tipo de día.
+- Volumen semanal por grupo muscular.
 
-Después: Progreso (gráficas, con Recharts cargado aparte) → extras (escáner,
-Open Food Facts, importación de JSON, fotos, exportación).
+Recharts debe entrar con `import()` diferido, no en el chunk principal: el
+bundle ya va por 612 kB (178 kB comprimido) y el plan pide abrir en menos de
+dos segundos.
 
-Queda pendiente de Comida: recetas y comidas guardadas de un toque.
+Luego la fase 6: escáner de código de barras, Open Food Facts, importación del
+JSON de macros, fotos de progreso y exportación. Y queda pendiente de Comida:
+recetas y comidas guardadas de un toque.
 
 ## Pendiente de tu parte
 

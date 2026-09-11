@@ -120,7 +120,31 @@ const idSerie = crypto.randomUUID()
   check('borrar un id inexistente no falla', !error, error?.message)
 }
 
-// 10 · Anónimo sigue sin poder leer nada
+// 10 · Dos rutinas activas: el orden de la cola es lo que evita el choque
+{
+  // La cuenta puede tener ya una rutina activa: se aparta y se restaura al
+  // final, para que la comprobación no dependa del estado de la base.
+  const previa = (await sb.from('rutinas').select('id').eq('activa', true)).data?.[0]
+  if (previa) await sb.from('rutinas').update({ activa: false }).eq('id', previa.id)
+
+  const a = crypto.randomUUID(), b = crypto.randomUUID()
+  await sb.from('rutinas').upsert({ id: a, nombre: 'Vieja', activa: true }, { onConflict: 'id' })
+
+  const choque = await sb.from('rutinas').upsert({ id: b, nombre: 'Nueva', activa: true }, { onConflict: 'id' })
+  check('activar sin desactivar choca con el índice (23505)', choque.error?.code === '23505',
+    `code=${choque.error?.code}`)
+
+  // Que es justo lo que hace `activarRutina`: desactivar primero, y la cola
+  // manda las operaciones en ese orden.
+  await sb.from('rutinas').upsert({ id: a, nombre: 'Vieja', activa: false }, { onConflict: 'id' })
+  const bien = await sb.from('rutinas').upsert({ id: b, nombre: 'Nueva', activa: true }, { onConflict: 'id' })
+  check('desactivar y luego activar sí funciona', !bien.error, bien.error?.message)
+
+  await sb.from('rutinas').delete().in('id', [a, b])
+  if (previa) await sb.from('rutinas').update({ activa: true }).eq('id', previa.id)
+}
+
+// 11 · Anónimo sigue sin poder leer nada
 {
   const anon = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY, { auth: { persistSession: false } })
   const { error } = await anon.from('ejercicios').select('id').limit(1)

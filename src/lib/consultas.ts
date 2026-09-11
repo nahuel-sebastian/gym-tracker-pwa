@@ -2,15 +2,19 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useState } from 'react'
 import { db } from './db'
 import { hoy } from './fechas'
+import { ultimaVez, type UltimaVez } from './entreno'
 import { sumarMacros, type Macros } from './nutricion'
 import type {
   Alimento,
   Dia,
+  Ejercicio,
   MedidaCorporal,
   ObjetivoNutricional,
   RegistroComida,
   Rutina,
   RutinaDia,
+  RutinaEjercicio,
+  Serie,
   Sesion,
   TipoDia,
 } from './tipos'
@@ -154,6 +158,90 @@ export function useDiasDeRutina(rutinaId: string | undefined): RutinaDia[] {
 
 export function useSesionesDelDia(fecha: string): Sesion[] {
   return useLiveQuery(() => db.sesiones.where('fecha').equals(fecha).toArray(), [fecha]) ?? []
+}
+
+// -----------------------------------------------------------------------------
+// Entrenamiento
+// -----------------------------------------------------------------------------
+
+/** El catálogo, sin los archivados salvo que se pidan. */
+export function useEjercicios(busqueda = '', incluirArchivados = false): Ejercicio[] {
+  return (
+    useLiveQuery(async () => {
+      const todos = await db.ejercicios.toArray()
+      const terminos = normalizar(busqueda).split(/\s+/).filter(Boolean)
+
+      return todos
+        .filter((e) => (incluirArchivados || !e.archivado) &&
+          terminos.every((t) => normalizar(`${e.nombre} ${e.grupo_muscular ?? ''}`).includes(t)))
+        .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+    }, [busqueda, incluirArchivados]) ?? []
+  )
+}
+
+/** Los ejercicios indexados por id, para resolver nombres al pintar series. */
+export function useCatalogo(): Map<string, Ejercicio> {
+  const lista = useLiveQuery(() => db.ejercicios.toArray()) ?? []
+  return new Map(lista.map((e) => [e.id, e]))
+}
+
+export function useSesion(id: string | undefined): Sesion | undefined {
+  return useLiveQuery(() => (id ? db.sesiones.get(id) : undefined), [id])
+}
+
+export function useSeriesDeSesion(sesionId: string | undefined): Serie[] {
+  return (
+    useLiveQuery(
+      () =>
+        sesionId
+          ? db.series.where('sesion_id').equals(sesionId).sortBy('numero')
+          : Promise.resolve([] as Serie[]),
+      [sesionId],
+    ) ?? []
+  )
+}
+
+export function useEjerciciosDeDia(diaId: string | null | undefined): RutinaEjercicio[] {
+  return (
+    useLiveQuery(
+      () =>
+        diaId
+          ? db.rutina_ejercicios.where('dia_id').equals(diaId).sortBy('orden')
+          : Promise.resolve([] as RutinaEjercicio[]),
+      [diaId],
+    ) ?? []
+  )
+}
+
+/**
+ * Qué se hizo la última vez en cada ejercicio. Se recalcula cuando cambian las
+ * series o las sesiones, así que al anotar una serie la referencia sigue viva.
+ */
+export function useUltimaVez(
+  ejercicioIds: string[],
+  excluirSesion?: string,
+): Map<string, UltimaVez> {
+  const clave = ejercicioIds.join(',')
+
+  return (
+    // `ultimaVez` consulta Dexie por dentro, y useLiveQuery sigue esas lecturas
+    // aunque estén en otra función: anotar una serie repite la consulta sola.
+    useLiveQuery(() => ultimaVez(ejercicioIds, excluirSesion), [clave, excluirSesion]) ??
+    new Map()
+  )
+}
+
+export function useRutinas(): Rutina[] {
+  return useLiveQuery(() => db.rutinas.orderBy('id').toArray()) ?? []
+}
+
+export function useSesiones(limite = 30): Sesion[] {
+  return (
+    useLiveQuery(
+      () => db.sesiones.orderBy('fecha').reverse().limit(limite).toArray(),
+      [limite],
+    ) ?? []
+  )
 }
 
 /** Si hay algo en la base local: distingue "sin datos" de "aún descargando". */
