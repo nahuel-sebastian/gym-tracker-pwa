@@ -449,57 +449,49 @@ Lo que queda no es plan, es rodaje:
    tema oscuro, los teclados numéricos, el `safe-area` y que el escáner enfoca.
    Nada de eso se puede verificar desde aquí.
 2. **Probar el escáner con un envase real** y la subida de una foto al bucket.
-3. **Poner el proyecto de producción** (ver abajo) y hacer un ciclo completo
-   contra él: registrar sin cobertura, recuperar red, comprobar que la cola se
-   vacía.
+3. **Un ciclo completo contra producción**: registrar sin cobertura, recuperar
+   red, comprobar que la cola se vacía. Y subir una foto, que es lo único que
+   falta por probar del bucket.
 4. Los datos de demo de la base local ya están borrados. Para volver a
    sembrarlos: `node scripts/datos-demo.mjs`.
 
-## Pendiente de tu parte
+## Producción
 
-Crear el proyecto real en supabase.com. Hasta entonces todo corre en local.
+El proyecto real está en pie y verificado (12 de septiembre de 2026). Referencia
+`puuojgunpzbptqgtblbe`; la URL y la clave pública están en
+`.env.production.local`, que git ignora. Vite solo lee ese archivo al construir:
+`npm run dev` sigue apuntando a la base local.
 
-1. **Proyecto nuevo**, región cercana (`eu-west` desde España). Guarda la
-   contraseña de la base de datos.
-2. **Authentication → Users → Add user** con tu email y contraseña, marcando
-   "Auto Confirm User". No habrá pantalla de registro.
-3. **SQL Editor**: pegar `docs/produccion.sql` entero y ejecutar. Son las cinco
-   migraciones concatenadas en orden; se regenera con:
+`node scripts/verificar-produccion.mjs --escribir` pasa las once comprobaciones:
 
-   ```bash
-   for f in supabase/migrations/*.sql; do echo; cat "$f"; done > docs/produccion.sql
-   ```
+**Sin sesión**, que es lo que puede intentar quien lea la clave del bundle:
 
-   Tiene que ir **después** del paso 2: la última parte siembra el catálogo a
-   nombre de la cuenta y, si no existe, avisa y no siembra.
-4. **Project Settings → API**: copiar `Project URL` y la clave `anon public` a
-   `.env.production.local` (hay plantilla en `.env.production.local.example`).
-   Ese archivo solo lo lee `npm run build`; `npm run dev` sigue apuntando a la
-   base local.
-5. Si despliegas en Vercel o Cloudflare Pages, las dos variables hay que
-   meterlas **además** en el panel del host: el archivo está en `.gitignore` y
-   no viaja con el repositorio.
+- Las catorce tablas existen.
+- RLS las cierra todas: ninguna filtra datos.
+- `ultimas_series()` existe y no es pública.
+- El anónimo no puede escribir.
 
-Comprobaciones después de cada paso, en `docs/produccion.sql`:
+**Con la cuenta**:
 
-- Tras el paso 3, en **Table Editor** deben salir 14 tablas y `ejercicios` con
-  70 filas. Si sale 0, el paso 2 no se había hecho: vuelve a ejecutar.
-- En **Storage** debe existir el bucket `fotos`, privado.
-- Si la parte del bucket falla por permisos, créalo desde **Storage → New
-  bucket** (privado, 5 MB, `image/jpeg` e `image/webp`) y vuelve a ejecutar solo
-  esa parte.
+- El catálogo trae los 70 ejercicios.
+- El bucket privado `fotos` responde.
+- Reenviar la misma fila no duplica — la garantía de la que depende la cola.
+- `user_id` se rellena solo con `auth.uid()`.
 
-Y para comprobarlo todo de una vez:
+Lo que **no** prueba esa tanda: la política de **escritura** del bucket. `list`
+solo ejercita la de lectura; la de subida no queda demostrada hasta que suba una
+foto de verdad desde el teléfono.
+
+Si hay que regenerar el esquema, `docs/produccion.sql` son las cinco migraciones
+concatenadas en orden, y se rehace con:
 
 ```bash
-node scripts/verificar-produccion.mjs --escribir
+for f in supabase/migrations/*.sql; do echo; cat "$f"; done > docs/produccion.sql
 ```
 
-Sin credenciales hace las comprobaciones anónimas, que son las de seguridad: que
-las catorce tablas existan y que RLS las cierre a la clave pública. Si le das la
-cuenta —la pide por teclado, no queda en el historial— comprueba además el
-catálogo, el bucket, que reenviar una fila no duplica y que `user_id` se rellena
-solo.
+Para desplegar, las dos variables hay que meterlas **además** en el panel de
+Vercel o Cloudflare Pages: el archivo está en `.gitignore` y no viaja con el
+repositorio.
 
 ## Cosas que quedaron abiertas
 
