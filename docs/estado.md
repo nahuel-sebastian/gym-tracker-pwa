@@ -315,10 +315,29 @@ Decisiones de esta fase:
 - **La exportación se arma desde la copia local**, no desde el servidor, así que
   también funciona sin conexión, y dice cuántos cambios quedaban sin enviar.
 
-**Sin comprobar en esta fase**: el escáner con una cámara real, la subida de una
-foto al bucket, y la descarga del JSON en Safari. Las tres piezas tienen su
-lógica cubierta por tests, pero el navegador no se ha podido abrir en esta
-sesión (la extensión de Chrome estaba desconectada).
+### Repaso de la fase 6 en el navegador
+
+Recorrido completo contra la base local: pegar el JSON del puente con vallas de
+markdown, corregir la estimación, confirmar; crear una receta con ingredientes y
+registrarla de un toque; **subir una foto de verdad** (431 kB y 3024×4032 →
+39 kB, ruta `<user_id>/<uuid>.jpg`, política de escritura del bucket
+funcionando) y comparar dos fechas; exportar 436 filas. Todo correcto.
+
+Tres cosas que solo se ven mirando, ya arregladas:
+
+1. **El bloque de instrucciones pedía scroll horizontal** (858 px de contenido
+   en 427 visibles): un `<pre>` no envuelve por defecto, y ese texto está para
+   leerlo en un móvil.
+2. **El buscador de Comida se pegaba a un `top` fijo de 3,5rem**, pero la
+   cabecera mide 3,5rem **más el safe-area**. En escritorio eran 1,5 px de
+   solape; en un iPhone el notch lo habría metido medio centímetro por debajo,
+   tapando el título. Es el tipo de fallo que no aparece en escritorio.
+3. **Cabecera y buscador compartían `z-index`**, así que por orden de DOM ganaba
+   el buscador y se dibujaba encima de la cabecera. La cabecera pasa a `z-20`.
+
+Sigue sin comprobar el escáner con una cámara real: no hay cámara en este
+entorno. Su lógica —resolución del código, orden biblioteca-antes-que-API,
+los cuatro finales de Open Food Facts— sí está cubierta por tests.
 
 ### Repaso en el navegador
 

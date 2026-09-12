@@ -31,7 +31,10 @@ export default function BloqueInstrucciones() {
         podrán importar desde Comida → Importar macros.
       </p>
 
-      <pre className="max-h-56 overflow-auto rounded-xl border border-borde bg-fondo p-3 text-xs leading-relaxed">
+      {/* `pre-wrap` en vez del `pre` de serie: con scroll horizontal, en un
+          iPhone las líneas largas quedarían fuera de la pantalla y este texto
+          está para leerlo. */}
+      <pre className="max-h-56 overflow-y-auto whitespace-pre-wrap break-words rounded-xl border border-borde bg-fondo p-3 text-xs leading-relaxed">
         {INSTRUCCIONES_PARA_CLAUDE}
       </pre>
 

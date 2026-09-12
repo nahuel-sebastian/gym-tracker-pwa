@@ -40,7 +40,11 @@ export default function Comida() {
 
   return (
     <div className="space-y-4">
-      <div className="sticky top-14 z-10 -mx-4 bg-fondo/95 px-4 pb-2 pt-1 backdrop-blur">
+      {/* Se pega justo debajo de la cabecera, que mide 3,5rem **más el
+          safe-area y el borde**: con un `top` fijo de 3,5rem, en un iPhone el notch lo
+          metería medio centímetro por debajo y taparía el título. El borde
+          inferior separa del contenido que pasa por detrás. */}
+      <div className="sticky top-[calc(env(safe-area-inset-top)+3.5rem+1px)] z-10 -mx-4 border-b border-borde bg-fondo/95 px-4 pb-2 pt-1 backdrop-blur">
         <input
           type="search"
           value={busqueda}

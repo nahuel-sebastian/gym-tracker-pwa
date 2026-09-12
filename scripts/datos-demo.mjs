@@ -208,6 +208,26 @@ for (let i = 41; i >= 1; i--) {
 }
 
 // -----------------------------------------------------------------------------
+// Claves naturales
+// -----------------------------------------------------------------------------
+
+/**
+ * `dias` y `medidas_corporales` tienen un índice único por (usuario, fecha).
+ * Si ya hay una fila para esa fecha —marcada a mano desde la app, por ejemplo—
+ * hay que reutilizar su id: un upsert con otro id choca contra el índice. Es la
+ * misma regla que aplica la app en `acciones.ts`.
+ */
+for (const tabla of ['dias', 'medidas_corporales']) {
+  const { data: existentes } = await sb.from(tabla).select('id, fecha')
+  const porFecha = new Map((existentes ?? []).map((f) => [f.fecha, f.id]))
+
+  for (const fila of filas[tabla]) {
+    const id = porFecha.get(fila.fecha)
+    if (id) fila.id = id
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Escritura
 // -----------------------------------------------------------------------------
 
