@@ -489,6 +489,18 @@ Comprobaciones después de cada paso, en `docs/produccion.sql`:
   bucket** (privado, 5 MB, `image/jpeg` e `image/webp`) y vuelve a ejecutar solo
   esa parte.
 
+Y para comprobarlo todo de una vez:
+
+```bash
+node scripts/verificar-produccion.mjs --escribir
+```
+
+Sin credenciales hace las comprobaciones anónimas, que son las de seguridad: que
+las catorce tablas existan y que RLS las cierre a la clave pública. Si le das la
+cuenta —la pide por teclado, no queda en el historial— comprueba además el
+catálogo, el bucket, que reenviar una fila no duplica y que `user_id` se rellena
+solo.
+
 ## Cosas que quedaron abiertas
 
 - `0005` es un bloque `DO`. Convertirlo en una función
