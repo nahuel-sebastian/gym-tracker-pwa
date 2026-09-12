@@ -508,9 +508,18 @@ concatenadas en orden, y se rehace con:
 for f in supabase/migrations/*.sql; do echo; cat "$f"; done > docs/produccion.sql
 ```
 
-Para desplegar, las dos variables hay que meterlas **además** en el panel de
-Vercel o Cloudflare Pages: el archivo está en `.gitignore` y no viaja con el
-repositorio.
+### Desplegar
+
+`vercel.json` y `public/_redirects` resuelven las rutas del cliente: sin ellos,
+abrir `/comida/importar` directamente da un 404 en la primera carga (el service
+worker lo cubre después con su `navigateFallback`, pero la primera visita no).
+El patrón de reescritura deja pasar los archivos reales —`/assets/*`, `sw.js`,
+el manifest, los iconos— y manda todo lo demás a `index.html`.
+
+Las dos variables hay que meterlas **además** en el panel del host, y volver a
+desplegar: Vite las incrusta al construir, así que un despliegue anterior a
+haberlas puesto abre en blanco. El archivo local está en `.gitignore` y no
+viaja con el repositorio.
 
 ## Cosas que quedaron abiertas
 

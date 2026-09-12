@@ -1,0 +1,6 @@
+# Cloudflare Pages y Netlify: las rutas del cliente las resuelve React Router,
+# así que todo lo que no sea un archivo real se sirve como index.html. Sin
+# esto, abrir /comida/importar directamente da un 404 en la primera carga
+# (después el service worker ya lo cubre con su navigateFallback, pero la
+# primera visita no).
+/*  /index.html  200
