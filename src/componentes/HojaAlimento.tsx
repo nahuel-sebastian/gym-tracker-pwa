@@ -53,6 +53,7 @@ export default function HojaAlimento({
         }
       : { ...VACIO, nombre: nombreInicial, codigo_barras: codigoInicial },
   )
+  const [favorito, setFavorito] = useState(alimento?.favorito ?? false)
   const [guardando, setGuardando] = useState(false)
 
   const poner = (clave: keyof typeof VACIO) => (e: { target: { value: string } }) =>
@@ -99,6 +100,7 @@ export default function HojaAlimento({
         carbos_100g: numeros.carbos!,
         porcion_defecto_g: aNumero(campos.porcion_defecto_g),
         codigo_barras: campos.codigo_barras.trim() || null,
+        favorito,
       })
       onGuardado?.(id)
       onCerrar()
@@ -118,6 +120,21 @@ export default function HojaAlimento({
           autoFocus={!alimento}
         />
         <Campo etiqueta="Marca" value={campos.marca} onChange={poner('marca')} />
+
+        <label className="flex min-h-12 items-center gap-3">
+          <input
+            type="checkbox"
+            checked={favorito}
+            onChange={(e) => setFavorito(e.target.checked)}
+            className="h-5 w-5 accent-[var(--color-acento)]"
+          />
+          <span className="text-sm">
+            Favorito
+            <span className="block text-xs text-tenue">
+              Sale delante de todo en el buscador.
+            </span>
+          </span>
+        </label>
 
         <p className="pt-1 text-xs font-semibold uppercase tracking-wide text-tenue">
           Por 100 gramos

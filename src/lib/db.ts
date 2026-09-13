@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type {
+  Ajustes,
   Alimento,
   Dia,
   Ejercicio,
@@ -69,6 +70,7 @@ export class BaseLocal extends Dexie {
   dias!: EntityTable<Dia, 'id'>
   medidas_corporales!: EntityTable<MedidaCorporal, 'id'>
   fotos_progreso!: EntityTable<FotoProgreso, 'id'>
+  ajustes!: EntityTable<Ajustes, 'id'>
 
   cola!: EntityTable<Operacion, 'id'>
   fallidas!: EntityTable<OperacionFallida, 'id'>
@@ -96,6 +98,8 @@ export class BaseLocal extends Dexie {
       dias: 'id, fecha',
       medidas_corporales: 'id, fecha',
       fotos_progreso: 'id, fecha',
+      // Una sola fila; no hay nada por lo que filtrarla.
+      ajustes: 'id',
 
       // `tabla` y `fila_id` van sueltos además del compuesto: Dexie no resuelve
       // una consulta por el primer componente de un índice compuesto.

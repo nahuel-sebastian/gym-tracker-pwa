@@ -6,6 +6,7 @@ import { ultimaVez, type UltimaVez } from './entreno'
 import { sumarMacros, type Macros } from './nutricion'
 import { ingredientesDe, type IngredienteConFicha } from './recetas'
 import type {
+  Ajustes,
   Alimento,
   Dia,
   Ejercicio,
@@ -325,6 +326,11 @@ export function useTiposDeDia(desde: string): Map<string, TipoDia> {
     [desde],
   )
   return new Map((dias ?? []).map((d) => [d.fecha, d.tipo]))
+}
+
+/** Los ajustes del usuario. Una sola fila, o ninguna si nunca se tocaron. */
+export function useAjustes(): Ajustes | undefined {
+  return useLiveQuery(() => db.ajustes.toCollection().first())
 }
 
 /** Si hay algo en la base local: distingue "sin datos" de "aún descargando". */

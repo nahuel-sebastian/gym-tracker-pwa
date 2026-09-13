@@ -3,9 +3,11 @@ import {
   inicioDeSemana,
   mediasSemanales,
   progresionEjercicio,
+  proyeccionDePeso,
   serieDePeso,
   tendenciaPeso,
   volumenPorGrupo,
+  volumenSemanalPorGrupo,
 } from './progreso'
 import type { Ejercicio, MedidaCorporal, RegistroComida, Serie, Sesion } from './tipos'
 
@@ -212,5 +214,89 @@ describe('volumenPorGrupo', () => {
     expect(volumenPorGrupo(series, sesiones, ejercicios, '2026-09-01', '2026-09-30')).toEqual([
       { grupo: 'sin grupo', series: 1 },
     ])
+  })
+})
+
+describe('proyeccionDePeso', () => {
+  const bajando = (kgPorDia: number, dias = 40) =>
+    serieDePeso(
+      Array.from({ length: dias }, (_, i) => {
+        const d = new Date(2026, 7, 1 + i)
+        const f = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+        return medida(f, 82 - i * kgPorDia)
+      }),
+    )
+
+  it('dice cuántas semanas faltan al ritmo de las últimas cuatro', () => {
+    // Bajando 0,1 kg al día son 0,7 por semana. Desde ~79 hasta 76 son 3 kg.
+    const p = proyeccionDePeso(bajando(0.1), 76)
+    expect(p).not.toBeNull()
+    expect(p!.ritmo).toBeCloseTo(-0.7, 1)
+    expect(p!.alReves).toBe(false)
+    expect(p!.semanas).toBeGreaterThan(0)
+    expect(p!.semanas).toBeLessThan(10)
+  })
+
+  it('avisa cuando el ritmo va al lado contrario del objetivo', () => {
+    // Bajando, pero con el objetivo por encima del peso actual.
+    const p = proyeccionDePeso(bajando(0.1), 90)
+    expect(p!.alReves).toBe(true)
+    expect(p!.semanas).toBe(Infinity)
+  })
+
+  it('no proyecta sin objetivo, sin tendencia o ya en el objetivo', () => {
+    expect(proyeccionDePeso(bajando(0.1), null)).toBeNull()
+    // Peso plano: no hay ritmo del que tirar.
+    expect(proyeccionDePeso(bajando(0), 76)).toBeNull()
+    // A menos de medio kilo, una cifra de semanas es ruido de la báscula.
+    const puntos = bajando(0.1)
+    const actual = [...puntos].reverse().find((p) => p.media !== null)!.media!
+    expect(proyeccionDePeso(puntos, actual - 0.2)).toBeNull()
+  })
+})
+
+describe('volumenSemanalPorGrupo', () => {
+  const ejercicios = new Map<string, Ejercicio>([
+    ['press', { id: 'press', nombre: 'Press', grupo_muscular: 'pecho', equipamiento: 'barra', es_unilateral: false, notas: null, archivado: false }],
+    ['remo', { id: 'remo', nombre: 'Remo', grupo_muscular: 'espalda', equipamiento: 'barra', es_unilateral: false, notas: null, archivado: false }],
+  ])
+
+  const sesion = (id: string, fecha: string): Sesion => ({
+    id, dia_id: null, nombre_dia: null, fecha, hora_inicio: null, hora_fin: null, notas: null, sensacion: null,
+  })
+
+  const serie = (id: string, ses: string, ej: string, tipo: Serie['tipo'] = 'normal'): Serie => ({
+    id, sesion_id: ses, ejercicio_id: ej, numero: 1, peso_kg: 80, reps: 8, rir: 2, tipo,
+  })
+
+  it('cuenta series efectivas por grupo y semana, y rellena las semanas vacías', () => {
+    const sesiones = [sesion('a', '2026-09-01'), sesion('b', '2026-09-15')]
+    const series = [
+      serie('1', 'a', 'press'), serie('2', 'a', 'press'), serie('3', 'a', 'press', 'calentamiento'),
+      serie('4', 'a', 'remo'),
+      serie('5', 'b', 'press'),
+    ]
+
+    const { semanas, porGrupo } = volumenSemanalPorGrupo(
+      series, sesiones, ejercicios, '2026-09-01', '2026-09-20',
+    )
+
+    // Del 31 ago al 14 sep: tres semanas, con la del medio a cero.
+    expect(semanas).toEqual(['2026-08-31', '2026-09-07', '2026-09-14'])
+    expect(porGrupo[0]).toEqual({ grupo: 'pecho', series: [2, 0, 1] })
+    expect(porGrupo[1]).toEqual({ grupo: 'espalda', series: [1, 0, 0] })
+  })
+
+  it('ordena los grupos por volumen total del periodo', () => {
+    const sesiones = [sesion('a', '2026-09-01')]
+    const series = [serie('1', 'a', 'remo'), serie('2', 'a', 'remo'), serie('3', 'a', 'press')]
+    const { porGrupo } = volumenSemanalPorGrupo(series, sesiones, ejercicios, '2026-09-01', '2026-09-07')
+    expect(porGrupo.map((g) => g.grupo)).toEqual(['espalda', 'pecho'])
+  })
+
+  it('sin sesiones en el rango no devuelve semanas', () => {
+    expect(volumenSemanalPorGrupo([], [], ejercicios, '2026-09-01', '2026-09-07')).toEqual({
+      semanas: [], porGrupo: [],
+    })
   })
 })

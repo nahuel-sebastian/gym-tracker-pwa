@@ -54,6 +54,7 @@ const TABLAS = [
   'ejercicios', 'rutinas', 'rutina_dias', 'rutina_ejercicios', 'sesiones', 'series',
   'alimentos', 'recetas', 'receta_ingredientes', 'registros_comida',
   'objetivos_nutricionales', 'dias', 'medidas_corporales', 'fotos_progreso',
+  'ajustes',
 ]
 
 let fallos = 0
@@ -85,7 +86,7 @@ for (const tabla of TABLAS) {
 }
 
 check(
-  'las catorce tablas existen',
+  `las ${TABLAS.length} tablas existen`,
   faltan.length === 0,
   faltan.length ? `faltan: ${faltan.join(', ')}` : `${TABLAS.length} tablas`,
 )

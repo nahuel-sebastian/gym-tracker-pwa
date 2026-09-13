@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { registrarAlimento } from '../lib/acciones'
+import { guardarAlimento, registrarAlimento } from '../lib/acciones'
+import { useAlimento } from '../lib/consultas'
 import { OPCIONES_MOMENTO } from '../lib/momentos'
 import { aNumeroPositivo, aTexto, formatoKcal, formatoNumero } from '../lib/numeros'
 import { macrosDeAlimento } from '../lib/nutricion'
@@ -24,14 +25,19 @@ type Props = {
  * la hora, así que el caso normal es abrir y confirmar.
  */
 export default function HojaAnadirAlimento({
-  alimento,
+  alimento: recibido,
   fecha,
   momentoInicial,
   onCerrar,
   onRegistrado,
   onEditarFicha,
 }: Props) {
-  const [gramos, setGramos] = useState(() => aTexto(alimento.porcion_defecto_g ?? 100))
+  // La pantalla de Comida pasa una copia del alimento, no la fila viva. Al
+  // marcarlo favorito desde aquí, sin esta lectura la estrella no cambiaría
+  // aunque el dato ya esté guardado.
+  const alimento = useAlimento(recibido.id) ?? recibido
+
+  const [gramos, setGramos] = useState(() => aTexto(recibido.porcion_defecto_g ?? 100))
   const [momento, setMomento] = useState<Momento>(momentoInicial)
   const [guardando, setGuardando] = useState(false)
 
@@ -53,16 +59,37 @@ export default function HojaAnadirAlimento({
   return (
     <Hoja titulo={alimento.nombre} onCerrar={onCerrar}>
       <div className="space-y-4">
-        <div className="-mt-2 flex items-baseline justify-between gap-3">
+        <div className="-mt-2 flex items-center justify-between gap-3">
           <p className="text-sm text-tenue">{alimento.marca ?? ''}</p>
-          {onEditarFicha && (
+          <div className="flex shrink-0 items-center gap-1">
+            {/* El favorito se marca aquí, que es donde te das cuenta de que lo
+                es: registrándolo por quinta vez. El buscador los pone delante
+                de todo lo demás. */}
             <button
-              onClick={onEditarFicha}
-              className="shrink-0 text-sm font-medium text-acento active:opacity-70"
+              onClick={() =>
+                void guardarAlimento({
+                  id: alimento.id,
+                  nombre: alimento.nombre,
+                  favorito: !alimento.favorito,
+                })
+              }
+              aria-pressed={alimento.favorito}
+              aria-label={alimento.favorito ? 'Quitar de favoritos' : 'Marcar como favorito'}
+              className={`flex h-11 w-11 items-center justify-center rounded-full text-lg ${
+                alimento.favorito ? 'text-acento' : 'text-tenue'
+              } active:bg-fondo`}
             >
-              Editar ficha
+              {alimento.favorito ? '★' : '☆'}
             </button>
-          )}
+            {onEditarFicha && (
+              <button
+                onClick={onEditarFicha}
+                className="text-sm font-medium text-acento active:opacity-70"
+              >
+                Editar ficha
+              </button>
+            )}
+          </div>
         </div>
 
         <CampoNumero

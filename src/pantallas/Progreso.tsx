@@ -1,7 +1,8 @@
 import { Suspense, lazy, useMemo, useState } from 'react'
 import { Link } from 'react-router'
-import { Segmentado, Tarjeta } from '../componentes/Formulario'
+import { CampoNumero, Segmentado, Tarjeta } from '../componentes/Formulario'
 import {
+  useAjustes,
   useCatalogo,
   useHoy,
   useMedidas,
@@ -11,7 +12,8 @@ import {
   useTiposDeDia,
 } from '../lib/consultas'
 import { formatoCorto, sumarDias } from '../lib/fechas'
-import { formatoKcal, formatoNumero } from '../lib/numeros'
+import { aNumeroPositivo, aTexto, formatoKcal, formatoNumero } from '../lib/numeros'
+import { guardarPesoObjetivo } from '../lib/acciones'
 import {
   NOMBRE_METRICA,
   UNIDAD_METRICA,
@@ -19,7 +21,9 @@ import {
   progresionEjercicio,
   serieDePeso,
   tendenciaPeso,
+  proyeccionDePeso,
   volumenPorGrupo,
+  volumenSemanalPorGrupo,
   type Metrica,
   type VolumenGrupo,
 } from '../lib/progreso'
@@ -34,6 +38,7 @@ const GraficaPeso = lazy(() => import('../componentes/graficas/GraficaPeso'))
 const GraficaEjercicio = lazy(() => import('../componentes/graficas/GraficaEjercicio'))
 const GraficaSemanas = lazy(() => import('../componentes/graficas/GraficaSemanas'))
 const GraficaGrupos = lazy(() => import('../componentes/graficas/GraficaGrupos'))
+const GraficaGruposSemanal = lazy(() => import('../componentes/graficas/GraficaGruposSemanal'))
 
 const RANGOS = [
   { valor: '30', etiqueta: '30 días' },
@@ -60,8 +65,13 @@ export default function Progreso() {
   const tipos = useTiposDeDia(desde)
   const catalogo = useCatalogo()
 
+  const ajustes = useAjustes()
   const puntosPeso = useMemo(() => serieDePeso(medidas), [medidas])
   const tendencia = useMemo(() => tendenciaPeso(puntosPeso), [puntosPeso])
+  const proyeccion = useMemo(
+    () => proyeccionDePeso(puntosPeso, ajustes?.peso_objetivo),
+    [puntosPeso, ajustes?.peso_objetivo],
+  )
 
   return (
     <div className="space-y-4">
@@ -93,6 +103,8 @@ export default function Progreso() {
           <GraficaPeso puntos={puntosPeso} />
         </Suspense>
 
+        <PesoObjetivo objetivo={ajustes?.peso_objetivo ?? null} proyeccion={proyeccion} />
+
         <Datos
           cabeceras={['Fecha', 'Peso', 'Media 7 d']}
           filas={[...puntosPeso]
@@ -123,6 +135,10 @@ export default function Progreso() {
         <VolumenGrupos datos={volumenPorGrupo(series, sesiones, catalogo, desde, hoy)} />
       </Tarjeta>
 
+      <VolumenSemanal
+        datos={volumenSemanalPorGrupo(series, sesiones, catalogo, desde, hoy)}
+      />
+
       <Tarjeta>
         <h2 className="text-base font-semibold">Fotos de progreso</h2>
         <p className="mb-3 mt-1 text-sm text-tenue">
@@ -150,6 +166,121 @@ function VolumenGrupos({ datos }: { datos: VolumenGrupo[] }) {
         filas={datos.map((d) => [d.grupo, String(d.series)])}
       />
     </>
+  )
+}
+
+/**
+ * Semana a semana por grupo: no cuánto has hecho, sino si va subiendo o
+ * bajando. Es con lo que se decide tocar el volumen de un grupo.
+ */
+function VolumenSemanal({
+  datos,
+}: {
+  datos: ReturnType<typeof volumenSemanalPorGrupo>
+}) {
+  return (
+    <Tarjeta>
+      <h2 className="text-base font-semibold">Cómo ha ido el volumen</h2>
+      <p className="mb-3 mt-1 text-sm text-tenue">
+        Series efectivas por semana. Todas las gráficas comparten escala, así que
+        se pueden comparar entre sí.
+      </p>
+
+      <Suspense fallback={<Cargando />}>
+        <GraficaGruposSemanal semanas={datos.semanas} porGrupo={datos.porGrupo} />
+      </Suspense>
+
+      <Datos
+        cabeceras={['Grupo', ...datos.semanas.map((f) => formatoCorto(f))]}
+        filas={datos.porGrupo.map((g) => [g.grupo, ...g.series.map(String)])}
+      />
+    </Tarjeta>
+  )
+}
+
+/**
+ * Peso objetivo y cuánto falta al ritmo actual.
+ *
+ * El ritmo sale de la media móvil, no de dos pesajes: con el dato diario, un
+ * día de más sal daría una proyección absurda.
+ */
+function PesoObjetivo({
+  objetivo,
+  proyeccion,
+}: {
+  objetivo: number | null
+  proyeccion: ReturnType<typeof proyeccionDePeso>
+}) {
+  const [editando, setEditando] = useState(false)
+  const [texto, setTexto] = useState(() => aTexto(objetivo))
+
+  async function guardar() {
+    await guardarPesoObjetivo(aNumeroPositivo(texto))
+    setEditando(false)
+  }
+
+  if (editando || objetivo === null) {
+    return (
+      <div className="mt-3 border-t border-borde pt-3">
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <CampoNumero
+              etiqueta="Peso objetivo"
+              sufijo="kg"
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              ayuda="Para saber cuánto falta al ritmo de las últimas cuatro semanas."
+            />
+          </div>
+          <button
+            onClick={() => void guardar()}
+            className="mb-[1.65rem] min-h-12 rounded-xl bg-acento px-5 font-semibold text-fondo"
+          >
+            Guardar
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-3 flex items-center justify-between gap-3 border-t border-borde pt-3">
+      <div>
+        <p className="text-sm text-tenue">
+          Objetivo <span className="cifras text-texto">{formatoNumero(objetivo, 2)} kg</span>
+        </p>
+        <p className="mt-0.5 text-sm">
+          {proyeccion === null ? (
+            <span className="text-tenue">
+              Aún no hay tendencia con la que proyectar.
+            </span>
+          ) : proyeccion.alReves ? (
+            <span className="text-aviso">
+              Vas en dirección contraria: {formatoNumero(proyeccion.ritmo, 2)} kg por semana.
+            </span>
+          ) : (
+            <>
+              <span className="cifras font-semibold">
+                {proyeccion.semanas} {proyeccion.semanas === 1 ? 'semana' : 'semanas'}
+              </span>
+              <span className="text-tenue">
+                {' '}
+                a {formatoNumero(Math.abs(proyeccion.ritmo), 2)} kg por semana
+              </span>
+            </>
+          )}
+        </p>
+      </div>
+      <button
+        onClick={() => {
+          setTexto(aTexto(objetivo))
+          setEditando(true)
+        }}
+        className="min-h-11 shrink-0 rounded-xl border border-borde px-4 text-sm font-medium active:bg-fondo"
+      >
+        Cambiar
+      </button>
+    </div>
   )
 }
 

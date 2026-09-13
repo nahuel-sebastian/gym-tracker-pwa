@@ -44,7 +44,10 @@ export default function GraficaEjercicio({
   return (
     <div className="h-56 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={puntos} margin={{ top: 12, right: 40, bottom: 0, left: -12 }}>
+        {/* 28 arriba, no 12: la escala se ajusta al dato, así que el punto más
+            alto cae en el techo del área y su etiqueta necesita ese hueco o
+            sale recortada. */}
+        <LineChart data={puntos} margin={{ top: 28, right: 40, bottom: 0, left: -12 }}>
           <CartesianGrid {...REJILLA} />
           <XAxis dataKey="fecha" tickFormatter={ejeFecha} minTickGap={32} {...EJE} />
           <YAxis

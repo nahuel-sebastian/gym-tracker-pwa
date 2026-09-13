@@ -143,6 +143,31 @@ describe('pantalla Comida', () => {
     expect(await screen.findByRole('button', { name: 'Añadir' })).toBeDefined()
   })
 
+  it('marca un alimento como favorito desde la hoja de cantidad', async () => {
+    const usuario = userEvent.setup()
+    pintar()
+    await usuario.click(await screen.findByText('Pechuga de pollo'))
+
+    await usuario.click(await screen.findByLabelText('Marcar como favorito'))
+
+    await waitFor(async () => expect((await db.alimentos.get(pollo.id))?.favorito).toBe(true))
+    // Y la estrella lo refleja: la hoja lee la fila viva, no la copia que
+    // recibió al abrirse.
+    expect(await screen.findByLabelText('Quitar de favoritos')).toBeDefined()
+  })
+
+  it('los favoritos salen primero en el buscador', async () => {
+    await db.alimentos.update(pollo.id, { favorito: true })
+    pintar()
+
+    await waitFor(() => expect(screen.getByText('Pechuga de pollo')).toBeDefined())
+    const nombres = screen.getAllByRole('button').map((b) => b.textContent ?? '')
+    // El arroz tiene más usos, pero el favorito manda.
+    expect(nombres.findIndex((t) => t.includes('Pechuga de pollo'))).toBeLessThan(
+      nombres.findIndex((t) => t.includes('Arroz blanco')),
+    )
+  })
+
   it('corrige una ficha ya creada y vuelve a la cantidad', async () => {
     const usuario = userEvent.setup()
     pintar()

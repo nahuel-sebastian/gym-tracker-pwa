@@ -213,17 +213,24 @@ for (let i = 41; i >= 1; i--) {
 
 /**
  * `dias` y `medidas_corporales` tienen un índice único por (usuario, fecha).
- * Si ya hay una fila para esa fecha —marcada a mano desde la app, por ejemplo—
- * hay que reutilizar su id: un upsert con otro id choca contra el índice. Es la
- * misma regla que aplica la app en `acciones.ts`.
+ * Si ya hay una fila para esa fecha —marcada a mano desde la app— hay que
+ * reutilizar su id: un upsert con otro id choca contra el índice. Es la misma
+ * regla que aplica la app en `acciones.ts`.
+ *
+ * Se hace **después** de purgar el sembrado anterior. Las fechas son relativas
+ * a hoy, así que al sembrar otro día el id que antes cayó en una fecha cae en
+ * otra; si se mirasen las filas de demo viejas, dos filas del mismo lote
+ * acabarían con el mismo id y Postgres rechazaría el upsert entero.
  */
-for (const tabla of ['dias', 'medidas_corporales']) {
-  const { data: existentes } = await sb.from(tabla).select('id, fecha')
-  const porFecha = new Map((existentes ?? []).map((f) => [f.fecha, f.id]))
+async function reutilizarIdsPorFecha() {
+  for (const tabla of ['dias', 'medidas_corporales']) {
+    const { data: existentes } = await sb.from(tabla).select('id, fecha')
+    const porFecha = new Map((existentes ?? []).map((f) => [f.fecha, f.id]))
 
-  for (const fila of filas[tabla]) {
-    const id = porFecha.get(fila.fecha)
-    if (id) fila.id = id
+    for (const fila of filas[tabla]) {
+      const id = porFecha.get(fila.fecha)
+      if (id) fila.id = id
+    }
   }
 }
 
@@ -234,16 +241,40 @@ for (const tabla of ['dias', 'medidas_corporales']) {
 // Orden de dependencias al sembrar; al borrar, el inverso.
 const ORDEN = ['alimentos', 'medidas_corporales', 'dias', 'registros_comida', 'sesiones', 'series']
 
-if (BORRAR) {
+/** Quita el sembrado anterior. Los ids son deterministas, así que basta con
+ *  regenerarlos y borrarlos por id. */
+async function purgar(avisar) {
   for (const tabla of [...ORDEN].reverse()) {
     const ids = filas[tabla].map((f) => f.id)
+    let retenidas = 0
+
     for (let i = 0; i < ids.length; i += 200) {
       const { error } = await sb.from(tabla).delete().in('id', ids.slice(i, i + 200))
-      if (error) console.error(tabla, error.message)
+
+      // 23503: algo real apunta a una fila de demo. Las claves ajenas hacia
+      // `alimentos` son `restrict` justo para eso —un alimento con histórico no
+      // desaparece—, así que no es un fallo: se queda y el upsert la refresca.
+      if (error?.code === '23503') retenidas += 1
+      else if (error) console.error(tabla, error.message)
     }
-    console.log(`borrado  ${tabla}: ${ids.length}`)
+
+    if (avisar) {
+      console.log(
+        `borrado  ${tabla}: ${ids.length}` +
+          (retenidas ? ' (algunas se quedan: hay datos tuyos que las usan)' : ''),
+      )
+    }
   }
+}
+
+if (BORRAR) {
+  await purgar(true)
 } else {
+  // Sembrar es reemplazar, no fusionar: así da igual cuántos días hayan pasado
+  // desde la última vez.
+  await purgar(false)
+  await reutilizarIdsPorFecha()
+
   for (const tabla of ORDEN) {
     for (let i = 0; i < filas[tabla].length; i += 200) {
       const { error } = await sb

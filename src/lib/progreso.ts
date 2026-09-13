@@ -89,6 +89,51 @@ export function tendenciaPeso(puntos: PuntoPeso[], dias = 28): number | null {
   return redondear(ultimo.media! - referencia.media!, 2)
 }
 
+export type Proyeccion = {
+  /** Kilos por semana de la tendencia. Negativo si baja. */
+  ritmo: number
+  /** Semanas para llegar al objetivo al ritmo actual. */
+  semanas: number
+  /** `true` si el ritmo lleva al lado contrario del objetivo. */
+  alReves: boolean
+}
+
+/**
+ * Cuánto falta para el peso objetivo al ritmo de las últimas semanas.
+ *
+ * El ritmo sale de la media móvil, no de dos pesajes sueltos: con el dato
+ * diario, un día de más sal daría una proyección absurda. Devuelve `null`
+ * cuando no hay con qué proyectar —sin objetivo, sin tendencia, o ya en el
+ * objetivo—, porque una cifra inventada aquí es peor que ninguna.
+ */
+export function proyeccionDePeso(
+  puntos: PuntoPeso[],
+  objetivo: number | null | undefined,
+  dias = 28,
+): Proyeccion | null {
+  if (!objetivo) return null
+
+  const cambio = tendenciaPeso(puntos, dias)
+  if (cambio === null || cambio === 0) return null
+
+  const actual = [...puntos].reverse().find((p) => p.media !== null)?.media
+  if (actual === undefined || actual === null) return null
+
+  const restante = objetivo - actual
+  // Medio kilo de margen: por debajo de eso, decir "te faltan 3 semanas" es
+  // ruido de la báscula.
+  if (Math.abs(restante) < 0.5) return null
+
+  const ritmo = redondear((cambio / dias) * 7, 3)
+  const alReves = Math.sign(ritmo) !== Math.sign(restante)
+
+  return {
+    ritmo,
+    semanas: alReves ? Infinity : Math.ceil(Math.abs(restante / ritmo)),
+    alReves,
+  }
+}
+
 // -----------------------------------------------------------------------------
 // Progresión por ejercicio
 // -----------------------------------------------------------------------------
@@ -276,6 +321,59 @@ export function volumenPorGrupo(
   return [...cuenta.entries()]
     .map(([grupo, series]) => ({ grupo: grupo as VolumenGrupo['grupo'], series }))
     .sort((a, b) => b.series - a.series)
+}
+
+/**
+ * Series efectivas por grupo y por semana.
+ *
+ * El total del periodo dice cuánto; esto dice **cómo ha ido cambiando**, que es
+ * con lo que se decide subir o bajar el volumen de un grupo. Se rellenan las
+ * semanas sin nada a cero: un hueco en el eje mentiría sobre la continuidad.
+ */
+export function volumenSemanalPorGrupo(
+  series: Serie[],
+  sesiones: Sesion[],
+  ejercicios: Map<string, Ejercicio>,
+  desde: string,
+  hasta: string,
+): { semanas: string[]; porGrupo: { grupo: string; series: number[] }[] } {
+  const semanaDe = new Map<string, string>()
+  for (const s of sesiones) {
+    if (s.fecha >= desde && s.fecha <= hasta) semanaDe.set(s.id, inicioDeSemana(s.fecha))
+  }
+
+  if (!semanaDe.size) return { semanas: [], porGrupo: [] }
+
+  const semanas: string[] = []
+  const primera = [...semanaDe.values()].sort()[0]
+  const ultima = inicioDeSemana(hasta)
+  for (let f = primera; f <= ultima; f = sumarDias(f, 7)) semanas.push(f)
+
+  const indice = new Map(semanas.map((f, i) => [f, i]))
+  const cuenta = new Map<string, number[]>()
+
+  for (const s of series) {
+    const semana = semanaDe.get(s.sesion_id)
+    if (semana === undefined || !esEfectiva(s.tipo)) continue
+
+    const grupo = ejercicios.get(s.ejercicio_id)?.grupo_muscular ?? 'sin grupo'
+    let fila = cuenta.get(grupo)
+    if (!fila) {
+      fila = new Array(semanas.length).fill(0)
+      cuenta.set(grupo, fila)
+    }
+    fila[indice.get(semana)!] += 1
+  }
+
+  const porGrupo = [...cuenta.entries()]
+    .map(([grupo, series]) => ({ grupo, series }))
+    .sort((a, b) => sumar(b.series) - sumar(a.series))
+
+  return { semanas, porGrupo }
+}
+
+function sumar(xs: number[]): number {
+  return xs.reduce((a, b) => a + b, 0)
 }
 
 function redondear(n: number, decimales: number): number {

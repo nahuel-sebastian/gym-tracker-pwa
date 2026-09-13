@@ -160,6 +160,11 @@ export type MedidaCorporal = Base & {
   notas: string | null
 }
 
+/** Ajustes sueltos del usuario: una sola fila. */
+export type Ajustes = Base & {
+  peso_objetivo: number | null
+}
+
 export type FotoProgreso = Base & {
   fecha: string
   ruta_storage: string
@@ -183,11 +188,12 @@ export type Tablas = {
   dias: Dia
   medidas_corporales: MedidaCorporal
   fotos_progreso: FotoProgreso
+  ajustes: Ajustes
 }
 
 export type NombreTabla = keyof Tablas
 
-/** Las 14 tablas, en orden de dependencia: una fila nunca se envía antes de
+/** Las 15 tablas, en orden de dependencia: una fila nunca se envía antes de
  *  aquella a la que apunta su clave ajena. */
 export const TABLAS: NombreTabla[] = [
   'ejercicios',
@@ -204,4 +210,5 @@ export const TABLAS: NombreTabla[] = [
   'dias',
   'medidas_corporales',
   'fotos_progreso',
+  'ajustes',
 ]

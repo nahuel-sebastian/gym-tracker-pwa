@@ -55,6 +55,7 @@ contra un Supabase local real**:
 | `0003_funciones.sql` | RPC `ultimas_series()` para la vista de "última vez" |
 | `0004_storage.sql` | Bucket privado `fotos` con políticas por carpeta de usuario |
 | `0005_semilla_ejercicios.sql` | Catálogo de 70 ejercicios |
+| `0006_ajustes.sql` | Una fila por usuario para ajustes sueltos (peso objetivo) |
 
 Autenticación: cliente de Supabase con sesión persistente, contexto de sesión,
 pantalla de login (sin registro, la cuenta se crea a mano) y cierre de sesión
@@ -184,7 +185,7 @@ Decisiones de esta fase:
 `npm test` (vitest). Los de lógica corren sobre `fake-indexeddb`, así que
 ejercitan Dexie de verdad —transacciones e índices compuestos—, y los de
 pantalla montan el componente entero en jsdom contra esa misma base.
-**175 pruebas**, todas en verde:
+**191 pruebas**, todas en verde:
 
 - `src/lib/datos.test.ts` — fusión de cola, cancelación de envíos, cascadas,
   referencias a null, la descarga que no pisa lo pendiente.
@@ -314,6 +315,53 @@ Decisiones de esta fase:
   el archivo: el único fallo posible es un huérfano que nadie ve.
 - **La exportación se arma desde la copia local**, no desde el servidor, así que
   también funciona sin conexión, y dice cuántos cambios quedaban sin enviar.
+
+### Mejoras sobre lo entregado
+
+Cinco añadidos posteriores al plan, pedidos ya en uso. Los tres primeros
+existían a medias: la columna estaba en el esquema y no había forma de tocarla
+desde la interfaz.
+
+- **Tipo de serie.** `series.tipo` se pintaba si no era `normal`, pero
+  `anotarSerie` escribía siempre `normal` y no había selector: **los
+  calentamientos contaban como volumen efectivo** en Progreso. Ahora se elige
+  antes de anotar, y se puede corregir una serie ya anotada.
+
+  Añadirlo destapó dos sitios más donde el calentamiento no debía mandar, y que
+  antes no se notaban porque nunca había calentamientos: **"última vez" enseñaba
+  la serie de aproximación**, y **la propuesta de la siguiente serie salía de
+  ella** —tras calentar a 46,5 kg, la fila proponía 46,5 kg como serie de
+  trabajo—. Las dos filtran ya por trabajo efectivo.
+
+- **Favorito.** `alimentos.favorito` ordenaba el buscador y pintaba la estrella,
+  pero nada la ponía. Se marca desde la hoja de cantidad, que es donde te das
+  cuenta de que lo es. La hoja pasó a leer la fila viva: recibía una copia y la
+  estrella no cambiaba aunque el dato ya estuviera guardado.
+
+- **Descanso objetivo.** `rutina_ejercicios.descanso_seg` estaba sin escribir ni
+  leer. Se pone en el editor de rutina y se enseña junto al ejercicio durante la
+  sesión. **Sin temporizador**: descartado a propósito, el plan lo excluía y no
+  se iba a usar. El campo queda, así que añadirlo después es barato.
+
+- **Volumen semanal por grupo**, en pequeños múltiplos con escala compartida.
+  Siete grupos en un dibujo serían siete colores, que es donde una paleta
+  categórica deja de distinguirse; facetar lo resuelve sin colores y responde
+  mejor a la pregunta real —"¿le he bajado a espalda?"— que un apilado, donde
+  una barra que crece mueve todas las demás.
+
+- **Peso objetivo y proyección.** Cuántas semanas faltan al ritmo de las últimas
+  cuatro. El ritmo sale de la media móvil, no de dos pesajes: con el dato
+  diario, un día de más sal daría una cifra absurda. No proyecta sin objetivo,
+  sin tendencia, o a menos de medio kilo —ahí una cifra de semanas es ruido de
+  la báscula—, y avisa cuando el ritmo va al lado contrario.
+
+  Trae la migración **`0006_ajustes.sql`**: una fila por usuario para los
+  ajustes que no son una lista de nada. Hay que aplicarla también en producción.
+
+Dos cosas más que salieron mirándolo en el navegador: la etiqueta del último
+punto de la progresión por ejercicio se recortaba (la escala se ajusta al dato,
+así que el punto más alto cae en el techo del área), y el eje de los pequeños
+múltiplos quedaba fuera del dibujo por un margen negativo.
 
 ### Repaso de la fase 6 en el navegador
 
@@ -481,11 +529,13 @@ El proyecto real está en pie y verificado (12 de septiembre de 2026). Referenci
 `.env.production.local`, que git ignora. Vite solo lee ese archivo al construir:
 `npm run dev` sigue apuntando a la base local.
 
-`node scripts/verificar-produccion.mjs --escribir` pasa las once comprobaciones:
+`node scripts/verificar-produccion.mjs --escribir` pasa sus comprobaciones. Tras
+añadir `0006_ajustes.sql` espera **15 tablas**, así que hay que aplicar esa
+migración en producción antes de volver a pasarlo:
 
 **Sin sesión**, que es lo que puede intentar quien lea la clave del bundle:
 
-- Las catorce tablas existen.
+- Las quince tablas existen.
 - RLS las cierra todas: ninguna filtra datos.
 - `ultimas_series()` existe y no es pública.
 - El anónimo no puede escribir.

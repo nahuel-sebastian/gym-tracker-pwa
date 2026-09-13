@@ -146,6 +146,63 @@ describe('pantalla de sesión', () => {
     expect(pesos.some((p) => p.value === '')).toBe(true)
   })
 
+  it('anota una serie de calentamiento, que no cuenta como volumen', async () => {
+    const usuario = userEvent.setup()
+    pintar()
+
+    await screen.findByText(/Última vez/)
+    await usuario.click(screen.getByRole('radio', { name: 'Calent.' }))
+    await usuario.click(screen.getByLabelText('Anotar serie'))
+
+    await waitFor(async () => expect(await db.series.where('sesion_id').equals(HOY).count()).toBe(1))
+    expect((await db.series.where('sesion_id').equals(HOY).toArray())[0].tipo).toBe('calentamiento')
+  })
+
+  it('el tipo no se arrastra a la siguiente serie', async () => {
+    const usuario = userEvent.setup()
+    pintar()
+
+    await screen.findByText(/Última vez/)
+    await usuario.click(screen.getByRole('radio', { name: 'Calent.' }))
+    await usuario.click(screen.getByLabelText('Anotar serie'))
+    await screen.findByLabelText('Peso de la serie 2')
+
+    // Lo habitual es una de aproximación y el resto efectivas.
+    await usuario.click(screen.getByLabelText('Anotar serie'))
+    await waitFor(async () => expect(await db.series.where('sesion_id').equals(HOY).count()).toBe(2))
+
+    const tipos = (await db.series.where('sesion_id').equals(HOY).sortBy('numero')).map((s) => s.tipo)
+    expect(tipos).toEqual(['calentamiento', 'normal'])
+  })
+
+  it('corrige el tipo de una serie ya anotada', async () => {
+    const usuario = userEvent.setup()
+    pintar()
+
+    await screen.findByText(/Última vez/)
+    await usuario.click(screen.getByLabelText('Anotar serie'))
+    await waitFor(async () => expect(await db.series.where('sesion_id').equals(HOY).count()).toBe(1))
+
+    await usuario.click(screen.getByLabelText('Tipo de la serie 1: Normal'))
+    // El selector de la fila ya anotada va antes en el DOM que el de la nueva.
+    await usuario.click((await screen.findAllByRole('radio', { name: 'Calent.' }))[0])
+
+    await waitFor(async () =>
+      expect((await db.series.where('sesion_id').equals(HOY).toArray())[0].tipo).toBe(
+        'calentamiento',
+      ),
+    )
+  })
+
+  it('enseña el descanso objetivo junto al ejercicio', async () => {
+    await guardarDelServidor('rutina_ejercicios', [
+      { id: 're1', dia_id: DIA, ejercicio_id: PRESS, orden: 0, series_objetivo: 3, reps_objetivo: '8-10', rir_objetivo: 2, descanso_seg: 150 },
+    ])
+
+    pintar()
+    expect(await screen.findByText('3 series · 8-10 reps · RIR 2 · 2:30')).toBeDefined()
+  })
+
   it('borra una serie mal anotada', async () => {
     const usuario = userEvent.setup()
     pintar()

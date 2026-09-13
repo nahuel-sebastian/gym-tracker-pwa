@@ -40,6 +40,15 @@ export async function registrarPeso(fecha: string, peso_kg: number | null): Prom
 }
 
 /**
+ * Guarda el peso objetivo. Hay una sola fila de ajustes por usuario, así que se
+ * reutiliza la que haya: el índice único rechazaría una segunda.
+ */
+export async function guardarPesoObjetivo(peso_objetivo: number | null): Promise<string> {
+  const existente = await db.ajustes.toCollection().first()
+  return guardar('ajustes', { id: existente?.id, peso_objetivo })
+}
+
+/**
  * Guarda el objetivo de un tipo de día con vigencia desde hoy.
  *
  * No sobrescribe el objetivo anterior: se añade una fila nueva y la de ayer

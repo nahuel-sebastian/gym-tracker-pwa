@@ -146,3 +146,66 @@ describe('volumen y 1RM', () => {
     expect(unoRM(80, 8)).toBeCloseTo(101.33, 2)
   })
 })
+
+describe('esEfectiva, que es lo que el selector de tipo hace posible', () => {
+  const base = { id: 'x', sesion_id: 's', ejercicio_id: PRESS, numero: 1, peso_kg: 80, reps: 8, rir: 2 }
+
+  it('solo el calentamiento queda fuera del trabajo efectivo', () => {
+    // Antes del selector, todo se guardaba como `normal` y las series de
+    // aproximación se contaban como volumen en las gráficas.
+    expect(volumenDeSerie({ ...base, tipo: 'normal' })).toBe(640)
+    expect(volumenDeSerie({ ...base, tipo: 'dropset' })).toBe(640)
+    expect(volumenDeSerie({ ...base, tipo: 'fallo' })).toBe(640)
+    expect(volumenDeSerie({ ...base, tipo: 'calentamiento' })).toBe(0)
+  })
+})
+
+describe('el calentamiento no manda en la referencia', () => {
+  const serie = (
+    id: string, sesion: string, numero: number, peso: number, reps: number,
+    tipo: Serie['tipo'] = 'normal',
+  ): Serie => ({ id, sesion_id: sesion, ejercicio_id: PRESS, numero, peso_kg: peso, reps, rir: 2, tipo })
+
+  beforeEach(async () => {
+    await Promise.all(db.tables.map((t) => t.clear()))
+  })
+
+  it('"última vez" enseña solo las series efectivas', async () => {
+    await guardarDelServidor('sesiones', [{ id: 's1', fecha: '2026-09-01', created_at: '2026-09-01T10:00:00Z' }])
+    await guardarDelServidor('series', [
+      serie('a', 's1', 1, 46.5, 10, 'calentamiento'),
+      serie('b', 's1', 2, 77.5, 7),
+      serie('c', 's1', 3, 77.5, 6),
+    ])
+
+    const anterior = (await ultimaVez([PRESS])).get(PRESS)
+    expect(anterior!.series.map((s) => s.peso_kg)).toEqual([77.5, 77.5])
+  })
+
+  it('una sesión que solo fue calentamiento no cuenta como última vez', async () => {
+    await guardarDelServidor('sesiones', [
+      { id: 'vieja', fecha: '2026-09-01', created_at: '2026-09-01T10:00:00Z' },
+      { id: 'tanteo', fecha: '2026-09-08', created_at: '2026-09-08T10:00:00Z' },
+    ])
+    await guardarDelServidor('series', [
+      serie('a', 'vieja', 1, 80, 8),
+      serie('b', 'tanteo', 1, 40, 12, 'calentamiento'),
+    ])
+
+    const anterior = (await ultimaVez([PRESS])).get(PRESS)
+    expect(anterior!.fecha).toBe('2026-09-01')
+    expect(anterior!.series[0].peso_kg).toBe(80)
+  })
+
+  it('tras calentar, la propuesta es el peso de trabajo de la última vez', () => {
+    const anterior = {
+      sesion_id: 's1',
+      fecha: '2026-09-04',
+      series: [serie('x', 's1', 1, 77.5, 8)],
+    }
+    const hoy = [serie('c', 'hoy', 1, 46.5, 10, 'calentamiento')]
+
+    // Sin esto propondría 46,5 kg como serie de trabajo.
+    expect(propuestaDeSerie(hoy, anterior, 2)).toMatchObject({ peso_kg: 77.5, reps: 8 })
+  })
+})

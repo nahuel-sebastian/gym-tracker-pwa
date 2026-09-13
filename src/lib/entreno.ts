@@ -22,6 +22,9 @@ export type UltimaVez = {
  *
  * `excluirSesion` deja fuera la sesión en curso: la última vez es la anterior,
  * no lo que se está registrando ahora mismo.
+ *
+ * Solo cuenta el trabajo efectivo: una sesión en la que un ejercicio solo tuvo
+ * calentamiento no fue una sesión de ese ejercicio.
  */
 export async function ultimaVez(
   ejercicioIds: string[],
@@ -31,7 +34,12 @@ export async function ultimaVez(
   if (!ejercicioIds.length) return resultado
 
   const series = await db.series.where('ejercicio_id').anyOf(ejercicioIds).toArray()
-  const relevantes = series.filter((s) => s.sesion_id !== excluirSesion)
+
+  // Solo el trabajo efectivo. "Última vez" existe para decidir la carga de hoy,
+  // y un calentamiento de aproximación no dice nada de eso; además es de donde
+  // sale la propuesta de la siguiente serie, así que colarlo propondría el peso
+  // del calentamiento como si fuera una serie de trabajo.
+  const relevantes = series.filter((s) => s.sesion_id !== excluirSesion && esEfectiva(s.tipo))
   if (!relevantes.length) return resultado
 
   const sesiones = await db.sesiones.bulkGet([...new Set(relevantes.map((s) => s.sesion_id))])
@@ -90,7 +98,10 @@ export function propuestaDeSerie(
   anterior: UltimaVez | undefined,
   numero: number,
 ): { peso_kg: number | null; reps: number | null; rir: number | null } {
-  const ultimaDeHoy = hechasHoy.at(-1)
+  // Igual que en "última vez": el calentamiento no manda. Al empezar una
+  // sesión anotando la aproximación, la siguiente fila debe proponer el peso de
+  // trabajo de la última vez, no los 46 kg con los que acabas de calentar.
+  const ultimaDeHoy = hechasHoy.filter((s) => esEfectiva(s.tipo)).at(-1)
   if (ultimaDeHoy) {
     return {
       peso_kg: ultimaDeHoy.peso_kg,

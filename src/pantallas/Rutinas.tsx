@@ -272,6 +272,7 @@ function HojaObjetivos({
   const [series, setSeries] = useState(() => aTexto(ejercicio.series_objetivo))
   const [reps, setReps] = useState(ejercicio.reps_objetivo ?? '')
   const [rir, setRir] = useState(() => aTexto(ejercicio.rir_objetivo))
+  const [descanso, setDescanso] = useState(() => aTexto(ejercicio.descanso_seg))
   const [notas, setNotas] = useState(ejercicio.notas ?? '')
 
   async function guardarObjetivos() {
@@ -280,6 +281,7 @@ function HojaObjetivos({
       series_objetivo: aNumero(series),
       reps_objetivo: reps.trim() || null,
       rir_objetivo: aNumero(rir),
+      descanso_seg: aNumero(descanso),
       notas: notas.trim() || null,
     })
     onCerrar()
@@ -303,6 +305,13 @@ function HojaObjetivos({
           />
           <CampoNumero etiqueta="RIR" value={rir} onChange={(e) => setRir(e.target.value)} />
         </div>
+        <CampoNumero
+          etiqueta="Descanso"
+          sufijo="s"
+          value={descanso}
+          onChange={(e) => setDescanso(e.target.value)}
+          ayuda="Se enseña junto al ejercicio durante la sesión."
+        />
         <Campo
           etiqueta="Notas"
           value={notas}

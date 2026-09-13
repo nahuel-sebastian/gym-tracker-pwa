@@ -15,11 +15,12 @@ import { aNumero, aTexto, formatoNumero } from '../lib/numeros'
 import {
   anotarSerie,
   borrarSerie,
+  corregirSerie,
   reabrirSesion,
   terminarSesion,
   type ValoresSerie,
 } from '../lib/rutinas'
-import type { Ejercicio, RutinaEjercicio, Serie } from '../lib/tipos'
+import type { Ejercicio, RutinaEjercicio, Serie, TipoSerie } from '../lib/tipos'
 
 /**
  * La sesión en curso: la pantalla que se usa de pie, con una mano y a veces sin
@@ -128,6 +129,7 @@ function BloqueEjercicio({
         plan.series_objetivo ? `${plan.series_objetivo} series` : null,
         plan.reps_objetivo ? `${plan.reps_objetivo} reps` : null,
         plan.rir_objetivo !== null ? `RIR ${plan.rir_objetivo}` : null,
+        plan.descanso_seg ? formatoDescanso(plan.descanso_seg) : null,
       ]
         .filter(Boolean)
         .join(' · ')
@@ -158,6 +160,62 @@ function BloqueEjercicio({
         />
       )}
     </Tarjeta>
+  )
+}
+
+/** "90 s" por debajo del minuto y "2:30" por encima, como un cronómetro. */
+function formatoDescanso(segundos: number): string {
+  if (segundos < 60) return `${segundos} s`
+  const min = Math.floor(segundos / 60)
+  const resto = segundos % 60
+  return resto ? `${min}:${String(resto).padStart(2, '0')}` : `${min} min`
+}
+
+/** Abreviaturas, para que las cuatro opciones quepan en una fila estrecha. */
+const CORTO: Record<TipoSerie, string> = {
+  normal: 'Normal',
+  calentamiento: 'Calent.',
+  dropset: 'Dropset',
+  fallo: 'Fallo',
+}
+
+const TIPOS = Object.keys(CORTO) as TipoSerie[]
+
+/**
+ * Tipo de la serie.
+ *
+ * No es cosmético: `esEfectiva()` deja el calentamiento fuera del volumen y del
+ * 1RM. Sin esta fila, todo se guardaba como `normal` y las series de
+ * aproximación se contaban como trabajo efectivo en las gráficas de Progreso.
+ */
+function SelectorTipo({
+  valor,
+  onCambio,
+}: {
+  valor: TipoSerie
+  onCambio: (tipo: TipoSerie) => void
+}) {
+  return (
+    <div role="radiogroup" aria-label="Tipo de serie" className="flex gap-1.5">
+      {TIPOS.map((tipo) => {
+        const activo = tipo === valor
+        return (
+          <button
+            key={tipo}
+            role="radio"
+            aria-checked={activo}
+            onClick={() => onCambio(tipo)}
+            className={`min-h-9 flex-1 rounded-lg border text-xs font-medium transition-colors ${
+              activo
+                ? 'border-acento bg-acento/10 text-acento'
+                : 'border-borde text-tenue active:bg-fondo'
+            }`}
+          >
+            {CORTO[tipo]}
+          </button>
+        )
+      })}
+    </div>
   )
 }
 
@@ -192,25 +250,60 @@ function UltimaVezResumen({ anterior }: { anterior: UltimaVez | undefined }) {
 }
 
 function FilaHecha({ serie, bloqueado }: { serie: Serie; bloqueado: boolean }) {
+  const [corrigiendo, setCorrigiendo] = useState(false)
+
   return (
-    <li className="flex min-h-12 items-center gap-3 px-4 py-1.5">
-      <span className="cifras w-5 text-sm text-tenue">{serie.numero}</span>
-      <span className="cifras flex-1 text-sm">
-        {serie.peso_kg !== null ? `${formatoNumero(serie.peso_kg, 2)} kg` : '—'} ×{' '}
-        {serie.reps ?? '—'}
-        {serie.rir !== null && <span className="text-tenue"> · RIR {serie.rir}</span>}
-        {serie.tipo !== 'normal' && <span className="text-tenue"> · {serie.tipo}</span>}
-      </span>
-      {!bloqueado && (
-        <button
-          onClick={() => void borrarSerie(serie.id)}
-          aria-label={`Borrar serie ${serie.numero}`}
-          className="flex h-11 w-11 items-center justify-center rounded-full text-tenue active:bg-fondo"
-        >
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path d="M6 6l12 12M18 6 6 18" strokeLinecap="round" />
-          </svg>
-        </button>
+    <li className="px-4 py-1.5">
+      <div className="flex min-h-12 items-center gap-3">
+        <span className="cifras w-5 text-sm text-tenue">{serie.numero}</span>
+        <span className="cifras flex-1 text-sm">
+          {serie.peso_kg !== null ? `${formatoNumero(serie.peso_kg, 2)} kg` : '—'} ×{' '}
+          {serie.reps ?? '—'}
+          {serie.rir !== null && <span className="text-tenue"> · RIR {serie.rir}</span>}
+        </span>
+
+        {/* El tipo se enseña siempre, también cuando es normal: si solo
+            apareciera al no serlo, nadie descubriría que se puede cambiar. */}
+        {bloqueado ? (
+          <span className="text-xs text-tenue">{CORTO[serie.tipo]}</span>
+        ) : (
+          <button
+            onClick={() => setCorrigiendo((v) => !v)}
+            aria-expanded={corrigiendo}
+            aria-label={`Tipo de la serie ${serie.numero}: ${CORTO[serie.tipo]}`}
+            className={`min-h-9 rounded-lg border px-2 text-xs font-medium ${
+              serie.tipo === 'normal'
+                ? 'border-transparent text-tenue'
+                : 'border-borde text-texto'
+            }`}
+          >
+            {CORTO[serie.tipo]}
+          </button>
+        )}
+
+        {!bloqueado && (
+          <button
+            onClick={() => void borrarSerie(serie.id)}
+            aria-label={`Borrar serie ${serie.numero}`}
+            className="flex h-11 w-11 items-center justify-center rounded-full text-tenue active:bg-fondo"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path d="M6 6l12 12M18 6 6 18" strokeLinecap="round" />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {corrigiendo && !bloqueado && (
+        <div className="pb-1.5 pl-8">
+          <SelectorTipo
+            valor={serie.tipo}
+            onCambio={(tipo) => {
+              void corregirSerie(serie.id, { tipo })
+              setCorrigiendo(false)
+            }}
+          />
+        </div>
       )}
     </li>
   )
@@ -242,6 +335,7 @@ function FilaNueva({
     reps: string | null
     rir: string | null
   }>({ peso: null, reps: null, rir: null })
+  const [tipo, setTipo] = useState<TipoSerie>('normal')
 
   const peso = tecleado.peso ?? aTexto(propuesta.peso_kg)
   const reps = tecleado.reps ?? aTexto(propuesta.reps)
@@ -257,58 +351,68 @@ function FilaNueva({
       peso_kg: aNumero(peso),
       reps: aNumero(reps),
       rir: aNumero(rir),
+      tipo,
     })
     setTecleado({ peso: null, reps: null, rir: null })
+    // El tipo no se arrastra: lo normal es una de aproximación y el resto
+    // efectivas, no cuatro calentamientos seguidos.
+    setTipo('normal')
   }
 
   const celda =
     'cifras min-h-12 w-full rounded-xl border border-borde bg-fondo px-2 text-center outline-none focus:border-acento'
 
   return (
-    <div className="flex items-end gap-2 px-4 pt-3">
-      <span className="cifras mb-3 w-5 text-sm text-tenue">{numero}</span>
-      <label className="flex-1">
-        <span className="mb-1 block text-center text-[11px] text-tenue">kg</span>
-        <input
-          type="text"
-          inputMode="decimal"
-          value={peso}
-          aria-label={`Peso de la serie ${numero}`}
-          onChange={(e) => setPeso(e.target.value)}
-          className={celda}
-        />
-      </label>
-      <label className="flex-1">
-        <span className="mb-1 block text-center text-[11px] text-tenue">reps</span>
-        <input
-          type="text"
-          inputMode="numeric"
-          value={reps}
-          aria-label={`Repeticiones de la serie ${numero}`}
-          onChange={(e) => setReps(e.target.value)}
-          className={celda}
-        />
-      </label>
-      <label className="flex-1">
-        <span className="mb-1 block text-center text-[11px] text-tenue">RIR</span>
-        <input
-          type="text"
-          inputMode="numeric"
-          value={rir}
-          aria-label={`RIR de la serie ${numero}`}
-          onChange={(e) => setRir(e.target.value)}
-          className={celda}
-        />
-      </label>
-      <button
-        onClick={() => void anotar()}
-        aria-label="Anotar serie"
-        className="mb-0 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-acento text-fondo active:opacity-70"
-      >
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.5}>
-          <path d="m5 12.5 4.5 4.5L19 7" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
+    <div className="px-4 pt-3">
+      <div className="flex items-end gap-2">
+        <span className="cifras mb-3 w-5 text-sm text-tenue">{numero}</span>
+        <label className="flex-1">
+          <span className="mb-1 block text-center text-[11px] text-tenue">kg</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={peso}
+            aria-label={`Peso de la serie ${numero}`}
+            onChange={(e) => setPeso(e.target.value)}
+            className={celda}
+          />
+        </label>
+        <label className="flex-1">
+          <span className="mb-1 block text-center text-[11px] text-tenue">reps</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={reps}
+            aria-label={`Repeticiones de la serie ${numero}`}
+            onChange={(e) => setReps(e.target.value)}
+            className={celda}
+          />
+        </label>
+        <label className="flex-1">
+          <span className="mb-1 block text-center text-[11px] text-tenue">RIR</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={rir}
+            aria-label={`RIR de la serie ${numero}`}
+            onChange={(e) => setRir(e.target.value)}
+            className={celda}
+          />
+        </label>
+        <button
+          onClick={() => void anotar()}
+          aria-label="Anotar serie"
+          className="mb-0 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-acento text-fondo active:opacity-70"
+        >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.5}>
+              <path d="m5 12.5 4.5 4.5L19 7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+      </div>
+
+      <div className="mt-2 pl-7">
+        <SelectorTipo valor={tipo} onCambio={setTipo} />
+      </div>
     </div>
   )
 }
