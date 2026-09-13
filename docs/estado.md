@@ -56,6 +56,7 @@ contra un Supabase local real**:
 | `0004_storage.sql` | Bucket privado `fotos` con políticas por carpeta de usuario |
 | `0005_semilla_ejercicios.sql` | Catálogo de 70 ejercicios |
 | `0006_ajustes.sql` | Una fila por usuario para ajustes sueltos (peso objetivo) |
+| `0007_sembrar_catalogo.sql` | Función para sembrar el catálogo de cualquier cuenta |
 
 Autenticación: cliente de Supabase con sesión persistente, contexto de sesión,
 pantalla de login (sin registro, la cuenta se crea a mano) y cierre de sesión
@@ -362,6 +363,37 @@ Dos cosas más que salieron mirándolo en el navegador: la etiqueta del último
 punto de la progresión por ejercicio se recortaba (la escala se ajusta al dato,
 así que el punto más alto cae en el techo del área), y el eje de los pequeños
 múltiplos quedaba fuera del dibujo por un margen negativo.
+
+### Una segunda cuenta
+
+La app se diseñó para una persona, pero el esquema es por usuario desde la
+primera migración, así que admitir una segunda cuenta no pide cambios: RLS ya
+separa todo. Lo único que fallaba es que la **0005 siembra el catálogo a la
+primera cuenta de la base**, así que una cuenta nueva se encontraba con cero
+ejercicios.
+
+La **0007** convierte esa siembra en una función a la que se llama por email:
+
+```sql
+select public.sembrar_catalogo_ejercicios('otra@cuenta.com');
+```
+
+Es idempotente —el índice único por (usuario, nombre) descarta lo repetido— y
+**no se concede a `authenticated`**: sembrar es administración, y dárselo a la
+app dejaría que una cuenta escribiera filas a nombre de otra.
+
+Comprobado con dos cuentas reales en la base local
+(`node scripts/verificar-aislamiento.mjs`):
+
+- Las dos entran y tienen su propio `user_id`.
+- La cuenta nueva **no ve ni una fila ajena** en las doce tablas con datos.
+- Intentar escribir a nombre de la otra cuenta → `42501`.
+- Llamar a la función de siembra desde la app → `42501`.
+
+Lo que **no** cambia y conviene saber: si las dos cuentas comparten teléfono,
+cerrar sesión borra la copia local (así ha de ser, IndexedDB sobrevive al
+`signOut`), y la siguiente entrada vuelve a descargarlo todo. Con un teléfono
+cada uno, ni se nota.
 
 ### Repaso de la fase 6 en el navegador
 
