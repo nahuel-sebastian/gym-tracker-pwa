@@ -55,7 +55,7 @@ describe('importar macros', () => {
     expect(await screen.findByText('2 alimentos')).toBeDefined()
   })
 
-  it('un JSON malo en el enlace explica el error, no se queda en blanco', async () => {
+  it('un JSON malo en el enlace explica el error y deja el texto para arreglarlo', async () => {
     const roto = '{"alimentos":[{"nombre":"Salmón","kcal":300,"proteina":30,"carbos":0}]}'
     pintar('/comida/importar#json=' + encodeURIComponent(roto))
 
@@ -63,6 +63,19 @@ describe('importar macros', () => {
       'textContent',
       expect.stringContaining('grasa'),
     )
+
+    // La URL ya se ha limpiado, así que el campo es el único sitio donde queda
+    // el JSON: sin esto habría que volver a compartirlo desde Claude.
+    const campo = screen.getByLabelText('JSON de la comida') as HTMLTextAreaElement
+    expect(campo.value).toContain('Salmón')
+  })
+
+  it('el JSON del enlace también se escribe en el campo cuando va bien', async () => {
+    pintar('/comida/importar#json=' + encodeURIComponent(JSON_CLAUDE))
+
+    await screen.findByText('2 alimentos')
+    const campo = screen.getByLabelText('JSON de la comida') as HTMLTextAreaElement
+    expect(campo.value).toContain('Pechuga de pollo')
   })
 
   it('enseña una vista previa con el total antes de guardar nada', async () => {

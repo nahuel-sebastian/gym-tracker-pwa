@@ -210,7 +210,7 @@ Decisiones de esta fase:
 `npm test` (vitest). Los de lógica corren sobre `fake-indexeddb`, así que
 ejercitan Dexie de verdad —transacciones e índices compuestos—, y los de
 pantalla montan el componente entero en jsdom contra esa misma base.
-**200 pruebas**, todas en verde:
+**201 pruebas**, todas en verde:
 
 - `src/lib/datos.test.ts` — fusión de cola, cancelación de envíos, cascadas,
   referencias a null, la descarga que no pisa lo pendiente.
@@ -401,8 +401,15 @@ Claude → Compartir → Atajo → /comida/importar#json=…  → vista previa l
   **no se manda al servidor**, así que lo que se ha comido no acaba en el
   registro de accesos del host. La consulta (`?json=`) también se lee, porque es
   la única forma que tiene el `share_target` del manifest, que solo admite GET.
-- **La URL se limpia después de interpretar.** Si no, la comida se quedaría en
-  el historial de Safari y recargar la volvería a importar.
+- **La URL se limpia después de interpretar**, con `navigate(..., {replace})` y
+  no con `history.replaceState`: éste no le dice nada a React Router, y al volver
+  a renderizar el router reponía su URL interna, que aún llevaba el fragmento.
+  Sin limpiarla, la comida se quedaría en el historial de Safari y recargar la
+  volvería a importar.
+- **El texto se escribe en el campo además de interpretarse.** Si el JSON viene
+  mal, el campo es el único sitio donde queda para poder arreglarlo, porque la
+  URL ya está limpia. No basta con inicializar el estado: en el primer render la
+  ruta puede no traer todavía el fragmento.
 - `share_target` queda declarado en el manifest. **Safari no lo soporta** —de ahí
   el Atajo—, pero declararlo no cuesta nada: funciona en Android y el día que
   Safari lo implemente empieza a funcionar solo.

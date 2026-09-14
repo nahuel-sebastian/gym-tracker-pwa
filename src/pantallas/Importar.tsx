@@ -22,13 +22,13 @@ import type { Momento } from '../lib/tipos'
 export default function Importar() {
   const fechaHoy = useHoy()
   const navegar = useNavigate()
-  const { hash, search } = useLocation()
+  const { pathname, hash, search } = useLocation()
 
   // El JSON puede venir en la propia URL: es lo que manda el Atajo de iOS
   // desde la hoja de compartir de la app de Claude.
   const delEnlace = useMemo(() => jsonDeEnlace(hash, search), [hash, search])
 
-  const [texto, setTexto] = useState(delEnlace ?? '')
+  const [texto, setTexto] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [alimentos, setAlimentos] = useState<AlimentoEstimado[] | null>(null)
   const [ayer, setAyer] = useState(false)
@@ -48,8 +48,17 @@ export default function Importar() {
   useEffect(() => {
     if (!delEnlace) return
 
+    // El texto se escribe en el campo aparte de interpretarlo, y no basta con
+    // inicializar el estado: en el primer render la ruta puede no traer todavía
+    // el fragmento. Si falla el JSON, el campo es el único sitio donde queda
+    // para poder arreglarlo — la URL ya se ha limpiado.
+    setTexto(delEnlace)
     void interpretarTexto(delEnlace)
-    window.history.replaceState(null, '', '/comida/importar')
+
+    // Se limpia con el propio router, no con `history.replaceState`: éste no le
+    // dice nada a React Router, y al volver a renderizar por el `setTexto` el
+    // router reponía su URL interna, que aún llevaba el fragmento.
+    navegar(pathname, { replace: true })
     // Solo al llegar: reinterpretarlo en cada render sería absurdo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [delEnlace])
