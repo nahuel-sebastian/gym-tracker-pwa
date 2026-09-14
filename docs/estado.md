@@ -7,6 +7,30 @@ registra lo construido, las decisiones tomadas sobre el plan y cómo seguir.
 
 ---
 
+## Comprobarlo todo de una vez
+
+```bash
+npm run comprobar
+```
+
+Tipos, linter sin avisos, las 191 pruebas, la build, y que `docs/produccion.sql`
+siga al día respecto a `supabase/migrations/`. Es exactamente lo que corre
+`.github/workflows/comprobaciones.yml` en cada empujón, así que si pasa aquí
+pasa allí.
+
+El workflow **no necesita secretos**: Vite incrusta las variables de Supabase al
+construir, pero su ausencia no rompe la build —quedan como `undefined` y el
+cliente falla en ejecución, no en compilación—.
+
+`docs/produccion.sql` está **generado**. Al añadir una migración hay que
+regenerarlo, y la comprobación lo exige:
+
+```bash
+npm run produccion:sql
+```
+
+---
+
 ## Cómo retomar el trabajo
 
 ```bash

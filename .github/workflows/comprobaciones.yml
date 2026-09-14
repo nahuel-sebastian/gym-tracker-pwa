@@ -1,0 +1,50 @@
+# Comprobaciones de cada empujón. Nada de despliegue: eso lo hace Vercel por su
+# cuenta, y aquí solo interesa saber si algo se ha roto.
+#
+# No necesita secretos. Vite incrusta las variables de Supabase al construir,
+# pero su ausencia no rompe el build —quedan como `undefined` y el cliente falla
+# en tiempo de ejecución, no de compilación—, así que la comprobación de que
+# compila y pasa los tests funciona sin credenciales.
+name: Comprobaciones
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  # Para poder lanzarlo a mano desde la pestaña Actions.
+  workflow_dispatch:
+
+jobs:
+  comprobar:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # La versión sale de .nvmrc, para que CI y el portátil no se separen.
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Instalar
+        run: npm ci
+
+      - name: Tipos
+        run: npx tsc -b
+
+      - name: Linter
+        # --deny-warnings: el proyecto está a cero avisos y la idea es que siga.
+        run: npx oxlint --deny-warnings
+
+      - name: Pruebas
+        run: npm test
+
+      - name: Construir
+        run: npm run build
+
+      - name: El SQL de producción está al día
+        # docs/produccion.sql se genera de supabase/migrations/. Si alguien añade
+        # una migración y no lo regenera, el archivo que se pega en Supabase se
+        # queda corto y la tabla nueva no llega nunca.
+        run: node scripts/generar-produccion.mjs --revisar

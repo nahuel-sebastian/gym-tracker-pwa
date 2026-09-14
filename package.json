@@ -9,7 +9,9 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "comprobar": "tsc -b && oxlint --deny-warnings && vitest run && vite build && node scripts/generar-produccion.mjs --revisar",
+    "produccion:sql": "node scripts/generar-produccion.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

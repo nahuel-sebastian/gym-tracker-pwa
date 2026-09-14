@@ -1,8 +1,10 @@
 -- =============================================================================
 -- Esquema completo para el proyecto de PRODUCCIÓN
 --
--- Generado concatenando supabase/migrations/ en orden. Pégalo entero en el
--- SQL Editor de Supabase y ejecútalo de una vez.
+-- GENERADO. No editar a mano: sale de concatenar supabase/migrations/ en orden.
+--   node scripts/generar-produccion.mjs
+--
+-- Pégalo entero en el SQL Editor de Supabase y ejecútalo de una vez.
 --
 -- IMPORTANTE: crea antes la cuenta en Authentication → Users → Add user.
 -- La 0005 siembra el catálogo a la PRIMERA cuenta de la base. Para las demás,
@@ -315,6 +317,7 @@ begin
 end;
 $$;
 
+
 -- ####################  0002_rls.sql  ####################
 
 -- =============================================================================
@@ -358,6 +361,7 @@ begin
   end loop;
 end;
 $$;
+
 
 -- ####################  0003_funciones.sql  ####################
 
@@ -421,6 +425,7 @@ $$;
 revoke all on function public.ultimas_series(uuid[], uuid) from public, anon;
 grant execute on function public.ultimas_series(uuid[], uuid) to authenticated;
 
+
 -- ####################  0004_storage.sql  ####################
 
 -- =============================================================================
@@ -458,6 +463,7 @@ begin
   end loop;
 end;
 $$;
+
 
 -- ####################  0005_semilla_ejercicios.sql  ####################
 
@@ -573,6 +579,7 @@ begin
 end;
 $$;
 
+
 -- ####################  0006_ajustes.sql  ####################
 
 -- =============================================================================
@@ -616,6 +623,7 @@ create policy ajustes_propios on public.ajustes
   to authenticated
   using (user_id = (select auth.uid()))
   with check (user_id = (select auth.uid()));
+
 
 -- ####################  0007_sembrar_catalogo.sql  ####################
 
