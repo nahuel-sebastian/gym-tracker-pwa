@@ -2,7 +2,7 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
-import { RedirigirAImportar } from './App'
+import RedirigirAImportar from './RedirigirAImportar'
 
 afterEach(cleanup)
 

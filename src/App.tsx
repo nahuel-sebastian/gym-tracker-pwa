@@ -1,7 +1,8 @@
 import { useEffect } from 'react'
-import { Navigate, Route, Routes, useLocation } from 'react-router'
+import { Navigate, Route, Routes } from 'react-router'
 import BarraPestanas from './componentes/BarraPestanas'
 import Cabecera from './componentes/Cabecera'
+import RedirigirAImportar from './componentes/RedirigirAImportar'
 import { arrancarSincronizacion } from './lib/sincronizacion'
 import { useSesion } from './lib/useSesion'
 import Ajustes from './pantallas/Ajustes'
@@ -16,17 +17,6 @@ import Progreso from './pantallas/Progreso'
 import Recetas from './pantallas/Recetas'
 import Rutinas from './pantallas/Rutinas'
 import Sesion from './pantallas/Sesion'
-
-/**
- * La pantalla de importar vivía bajo /comida cuando solo traía macros. Ahora
- * trae rutinas y fichas, así que está en la raíz — pero el atajo del iPhone
- * que ya esté creado apunta a la vieja, y el JSON viaja en el fragmento, que
- * hay que arrastrar en la redirección o se pierde la importación entera.
- */
-export function RedirigirAImportar() {
-  const { search, hash } = useLocation()
-  return <Navigate to={{ pathname: '/importar', search, hash }} replace />
-}
 
 export default function App() {
   const { sesion, cargando } = useSesion()
