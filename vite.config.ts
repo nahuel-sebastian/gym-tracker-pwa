@@ -23,6 +23,17 @@ export default defineConfig({
         orientation: 'portrait',
         background_color: '#0B0F14',
         theme_color: '#0B0F14',
+        // Destino de la hoja de compartir del sistema. Safari no lo soporta
+        // —para iPhone se usa un Atajo que abre la app con el JSON en el
+        // fragmento—, pero declararlo no cuesta nada: funciona ya en Android y
+        // el día que Safari lo implemente empieza a funcionar solo.
+        share_target: {
+          action: '/comida/importar',
+          method: 'GET',
+          // Con GET el texto llega en la cadena de consulta, que sí viaja al
+          // servidor. El Atajo usa el fragmento, que no.
+          params: { text: 'json', title: 'titulo', url: 'json' },
+        },
         icons: [
           { src: '/pwa-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/pwa-512.png', sizes: '512x512', type: 'image/png' },

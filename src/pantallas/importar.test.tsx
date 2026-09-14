@@ -17,9 +17,9 @@ const JSON_CLAUDE = JSON.stringify({
   momento: 'almuerzo',
 })
 
-function pintar() {
+function pintar(ruta = '/comida/importar') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[ruta]}>
       <Importar />
     </MemoryRouter>,
   )
@@ -39,6 +39,32 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('importar macros', () => {
+  it('interpreta solo el JSON que llega en el enlace del Atajo', async () => {
+    // Compartir desde la app de Claude tiene que dejarte en la vista previa,
+    // sin un toque más.
+    pintar('/comida/importar#json=' + encodeURIComponent(JSON_CLAUDE))
+
+    expect(await screen.findByText('2 alimentos')).toBeDefined()
+    expect(await screen.findByRole('button', { name: /Añadir a almuerzo de hoy/ })).toBeDefined()
+    // Nada guardado todavía: sigue habiendo que confirmar.
+    expect(await db.registros_comida.count()).toBe(0)
+  })
+
+  it('también lo lee de la cadena de consulta, que es la vía del share_target', async () => {
+    pintar('/comida/importar?json=' + encodeURIComponent(JSON_CLAUDE))
+    expect(await screen.findByText('2 alimentos')).toBeDefined()
+  })
+
+  it('un JSON malo en el enlace explica el error, no se queda en blanco', async () => {
+    const roto = '{"alimentos":[{"nombre":"Salmón","kcal":300,"proteina":30,"carbos":0}]}'
+    pintar('/comida/importar#json=' + encodeURIComponent(roto))
+
+    expect(await screen.findByRole('alert')).toHaveProperty(
+      'textContent',
+      expect.stringContaining('grasa'),
+    )
+  })
+
   it('enseña una vista previa con el total antes de guardar nada', async () => {
     const usuario = userEvent.setup()
     pintar()

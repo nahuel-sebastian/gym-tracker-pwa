@@ -1,8 +1,9 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router'
 import { Boton, Campo, CampoNumero, Segmentado, Tarjeta } from '../componentes/Formulario'
 import { registrarImportado } from '../lib/acciones'
 import { useHoy } from '../lib/consultas'
+import { jsonDeEnlace } from '../lib/enlaces'
 import { ErrorDeFormato, estimarMacros, type AlimentoEstimado } from '../lib/estimacion'
 import { sumarDias } from '../lib/fechas'
 import { NOMBRE_MOMENTO, OPCIONES_MOMENTO, momentoSugerido } from '../lib/momentos'
@@ -21,8 +22,13 @@ import type { Momento } from '../lib/tipos'
 export default function Importar() {
   const fechaHoy = useHoy()
   const navegar = useNavigate()
+  const { hash, search } = useLocation()
 
-  const [texto, setTexto] = useState('')
+  // El JSON puede venir en la propia URL: es lo que manda el Atajo de iOS
+  // desde la hoja de compartir de la app de Claude.
+  const delEnlace = useMemo(() => jsonDeEnlace(hash, search), [hash, search])
+
+  const [texto, setTexto] = useState(delEnlace ?? '')
   const [error, setError] = useState<string | null>(null)
   const [alimentos, setAlimentos] = useState<AlimentoEstimado[] | null>(null)
   const [ayer, setAyer] = useState(false)
@@ -32,10 +38,26 @@ export default function Importar() {
 
   const fecha = ayer ? sumarDias(fechaHoy, -1) : fechaHoy
 
-  async function interpretar() {
+  /**
+   * Si llegó por enlace, se interpreta solo: compartir desde Claude tiene que
+   * dejarte directamente en la vista previa, sin un toque más.
+   *
+   * Y después se limpia la URL. Si no, la comida se quedaría en el historial de
+   * Safari y recargar la página la volvería a importar.
+   */
+  useEffect(() => {
+    if (!delEnlace) return
+
+    void interpretarTexto(delEnlace)
+    window.history.replaceState(null, '', '/comida/importar')
+    // Solo al llegar: reinterpretarlo en cada render sería absurdo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [delEnlace])
+
+  async function interpretarTexto(entrada: string) {
     setError(null)
     try {
-      const estimacion = await estimarMacros({ tipo: 'texto', contenido: texto })
+      const estimacion = await estimarMacros({ tipo: 'texto', contenido: entrada })
       setAlimentos(estimacion.alimentos)
       if (estimacion.momento) setMomento(estimacion.momento)
     } catch (e) {
@@ -44,6 +66,10 @@ export default function Importar() {
         e instanceof ErrorDeFormato ? e.message : 'No he podido leer eso. Revisa el formato.',
       )
     }
+  }
+
+  async function interpretar() {
+    await interpretarTexto(texto)
   }
 
   async function pegar() {
@@ -78,6 +104,7 @@ export default function Importar() {
         <h2 className="text-base font-semibold">Pega el JSON de Claude</h2>
         <p className="mb-3 mt-1 text-sm text-tenue">
           Las instrucciones para que te lo devuelva con este formato están en Ajustes.
+          Con el Atajo de iOS puedes compartirlo desde Claude y llegar aquí directo.
         </p>
 
         <textarea

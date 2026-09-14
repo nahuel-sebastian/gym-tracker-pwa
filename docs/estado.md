@@ -210,7 +210,7 @@ Decisiones de esta fase:
 `npm test` (vitest). Los de lógica corren sobre `fake-indexeddb`, así que
 ejercitan Dexie de verdad —transacciones e índices compuestos—, y los de
 pantalla montan el componente entero en jsdom contra esa misma base.
-**191 pruebas**, todas en verde:
+**200 pruebas**, todas en verde:
 
 - `src/lib/datos.test.ts` — fusión de cola, cancelación de envíos, cascadas,
   referencias a null, la descarga que no pisa lo pendiente.
@@ -387,6 +387,36 @@ Dos cosas más que salieron mirándolo en el navegador: la etiqueta del último
 punto de la progresión por ejercicio se recortaba (la escala se ajusta al dato,
 así que el punto más alto cae en el techo del área), y el eje de los pequeños
 múltiplos quedaba fuera del dibujo por un margen negativo.
+
+### Entrada por enlace: compartir desde Claude
+
+El puente manual pasa de cuatro toques a uno. El JSON puede llegar en la propia
+URL y la pantalla de Importar lo interpreta sola:
+
+```
+Claude → Compartir → Atajo → /comida/importar#json=…  → vista previa lista
+```
+
+- **Se prefiere el fragmento** (`#json=`) a la cadena de consulta. El fragmento
+  **no se manda al servidor**, así que lo que se ha comido no acaba en el
+  registro de accesos del host. La consulta (`?json=`) también se lee, porque es
+  la única forma que tiene el `share_target` del manifest, que solo admite GET.
+- **La URL se limpia después de interpretar.** Si no, la comida se quedaría en
+  el historial de Safari y recargar la volvería a importar.
+- `share_target` queda declarado en el manifest. **Safari no lo soporta** —de ahí
+  el Atajo—, pero declararlo no cuesta nada: funciona en Android y el día que
+  Safari lo implemente empieza a funcionar solo.
+
+**El Atajo de iOS**, cuatro bloques:
+
+1. *Recibir* **Texto** de la hoja de compartir.
+2. **Codificar URL** sobre ese texto.
+3. **Texto**: `https://<your-app>.vercel.app/comida/importar#json=` y detrás
+   la variable del paso 2.
+4. **Abrir URL** con el resultado.
+
+Nada de esto depende del proveedor: el Atajo solo mueve texto. Si algún día se
+llama a una API de visión, reutiliza el mismo enlace.
 
 ### Una segunda cuenta
 
