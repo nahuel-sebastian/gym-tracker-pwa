@@ -1,5 +1,6 @@
 import { borrar, guardar } from './datos'
 import { db } from './db'
+import type { RutinaImportada } from './rutinaImportada'
 import type { Ejercicio, RutinaDia, Serie, TipoSerie } from './tipos'
 
 /**
@@ -135,6 +136,13 @@ export async function borrarDia(id: string): Promise<void> {
   await borrar('rutina_dias', id)
 }
 
+/**
+ * Lo que se pone cuando no se dice otra cosa. Está exportado porque la vista
+ * previa de una rutina importada tiene que enseñar lo que se va a guardar de
+ * verdad, no un "?" donde luego habrá un 3.
+ */
+export const OBJETIVOS_DEFECTO = { series_objetivo: 3, reps_objetivo: '8-10', rir_objetivo: 2 }
+
 export async function anadirEjercicioADia(
   diaId: string,
   ejercicioId: string,
@@ -143,6 +151,7 @@ export async function anadirEjercicioADia(
     reps_objetivo?: string | null
     rir_objetivo?: number | null
     descanso_seg?: number | null
+    notas?: string | null
   } = {},
 ): Promise<string> {
   const hermanos = await db.rutina_ejercicios.where('dia_id').equals(diaId).toArray()
@@ -152,11 +161,11 @@ export async function anadirEjercicioADia(
     dia_id: diaId,
     ejercicio_id: ejercicioId,
     orden,
-    series_objetivo: objetivos.series_objetivo ?? 3,
-    reps_objetivo: objetivos.reps_objetivo ?? '8-10',
-    rir_objetivo: objetivos.rir_objetivo ?? 2,
+    series_objetivo: objetivos.series_objetivo ?? OBJETIVOS_DEFECTO.series_objetivo,
+    reps_objetivo: objetivos.reps_objetivo ?? OBJETIVOS_DEFECTO.reps_objetivo,
+    rir_objetivo: objetivos.rir_objetivo ?? OBJETIVOS_DEFECTO.rir_objetivo,
     descanso_seg: objetivos.descanso_seg ?? null,
-    notas: null,
+    notas: objetivos.notas ?? null,
   })
 }
 
@@ -221,4 +230,78 @@ export async function guardarEjercicio(
  */
 export async function archivarEjercicio(id: string, archivado = true): Promise<void> {
   await guardar('ejercicios', { id, archivado })
+}
+
+// -----------------------------------------------------------------------------
+// Importar y compartir rutinas
+// -----------------------------------------------------------------------------
+
+/**
+ * Guarda una rutina importada.
+ *
+ * Crea los ejercicios que no estaban en el catálogo, y **no activa la rutina**:
+ * el índice único del servidor solo admite una activa, y activar por sorpresa
+ * la que acabas de importar te cambiaría la que estás haciendo.
+ */
+export async function guardarRutinaImportada(
+  rutina: RutinaImportada,
+  fechaInicio: string,
+): Promise<string> {
+  const rutinaId = await crearRutina(rutina.nombre, fechaInicio)
+
+  for (const dia of rutina.dias) {
+    const diaId = await anadirDia(rutinaId, dia.nombre)
+
+    for (const e of dia.ejercicios) {
+      const ejercicioId =
+        e.ejercicio_id ?? (await guardarEjercicio({ nombre: e.nombre }))
+
+      await anadirEjercicioADia(diaId, ejercicioId, {
+        series_objetivo: e.series_objetivo,
+        reps_objetivo: e.reps_objetivo,
+        rir_objetivo: e.rir_objetivo,
+        descanso_seg: e.descanso_seg,
+        notas: e.notas,
+      })
+    }
+  }
+
+  return rutinaId
+}
+
+/**
+ * La rutina como JSON, con el mismo sobre que acepta el importador.
+ *
+ * Es lo que permite pasar una rutina a otra cuenta sin recrearla a mano, y sin
+ * pasar por Claude: la app produce lo que la app entiende. Los ejercicios van
+ * por nombre y no por id, porque los ids son de un usuario y no valen en otro.
+ */
+export async function rutinaComoJson(rutinaId: string): Promise<string> {
+  const rutina = await db.rutinas.get(rutinaId)
+  if (!rutina) throw new Error('Esa rutina ya no existe.')
+
+  const dias = await db.rutina_dias.where('rutina_id').equals(rutinaId).sortBy('orden')
+  const catalogo = new Map((await db.ejercicios.toArray()).map((e) => [e.id, e.nombre]))
+
+  const salida = {
+    tipo: 'rutina',
+    nombre: rutina.nombre,
+    dias: await Promise.all(
+      dias.map(async (dia) => ({
+        nombre: dia.nombre,
+        ejercicios: (await db.rutina_ejercicios.where('dia_id').equals(dia.id).sortBy('orden')).map(
+          (e) => ({
+            nombre: catalogo.get(e.ejercicio_id) ?? '(ejercicio borrado)',
+            series_objetivo: e.series_objetivo,
+            reps_objetivo: e.reps_objetivo,
+            rir_objetivo: e.rir_objetivo,
+            descanso_seg: e.descanso_seg,
+            notas: e.notas,
+          }),
+        ),
+      })),
+    ),
+  }
+
+  return JSON.stringify(salida, null, 2)
 }

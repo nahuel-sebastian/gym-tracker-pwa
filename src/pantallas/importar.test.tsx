@@ -17,7 +17,35 @@ const JSON_CLAUDE = JSON.stringify({
   momento: 'almuerzo',
 })
 
-function pintar(ruta = '/comida/importar') {
+const JSON_RUTINA = JSON.stringify({
+  tipo: 'rutina',
+  nombre: 'Full body 3 días',
+  dias: [
+    {
+      nombre: 'Día A — Empuje',
+      ejercicios: [
+        { nombre: 'press banca', series_objetivo: 4, reps_objetivo: '6-8', rir_objetivo: 2 },
+        { nombre: 'Face pull', series_objetivo: 3, reps_objetivo: '12-15' },
+      ],
+    },
+  ],
+})
+
+const JSON_FICHAS = JSON.stringify({
+  tipo: 'alimentos',
+  alimentos: [
+    {
+      nombre: 'Tortilla de patatas casera',
+      kcal_100g: 168,
+      proteina_100g: 5.1,
+      grasa_100g: 11.4,
+      carbos_100g: 11.2,
+      porcion_defecto_g: 150,
+    },
+  ],
+})
+
+function pintar(ruta = '/importar') {
   return render(
     <MemoryRouter initialEntries={[ruta]}>
       <Importar />
@@ -42,7 +70,7 @@ describe('importar macros', () => {
   it('interpreta solo el JSON que llega en el enlace del Atajo', async () => {
     // Compartir desde la app de Claude tiene que dejarte en la vista previa,
     // sin un toque más.
-    pintar('/comida/importar#json=' + encodeURIComponent(JSON_CLAUDE))
+    pintar('/importar#json=' + encodeURIComponent(JSON_CLAUDE))
 
     expect(await screen.findByText('2 alimentos')).toBeDefined()
     expect(await screen.findByRole('button', { name: /Añadir a almuerzo de hoy/ })).toBeDefined()
@@ -51,13 +79,13 @@ describe('importar macros', () => {
   })
 
   it('también lo lee de la cadena de consulta, que es la vía del share_target', async () => {
-    pintar('/comida/importar?json=' + encodeURIComponent(JSON_CLAUDE))
+    pintar('/importar?json=' + encodeURIComponent(JSON_CLAUDE))
     expect(await screen.findByText('2 alimentos')).toBeDefined()
   })
 
   it('un JSON malo en el enlace explica el error y deja el texto para arreglarlo', async () => {
     const roto = '{"alimentos":[{"nombre":"Salmón","kcal":300,"proteina":30,"carbos":0}]}'
-    pintar('/comida/importar#json=' + encodeURIComponent(roto))
+    pintar('/importar#json=' + encodeURIComponent(roto))
 
     expect(await screen.findByRole('alert')).toHaveProperty(
       'textContent',
@@ -71,7 +99,7 @@ describe('importar macros', () => {
   })
 
   it('el JSON del enlace también se escribe en el campo cuando va bien', async () => {
-    pintar('/comida/importar#json=' + encodeURIComponent(JSON_CLAUDE))
+    pintar('/importar#json=' + encodeURIComponent(JSON_CLAUDE))
 
     await screen.findByText('2 alimentos')
     const campo = screen.getByLabelText('JSON de la comida') as HTMLTextAreaElement
@@ -197,3 +225,123 @@ describe('importar macros', () => {
     expect(screen.queryByRole('button', { name: /Añadir a/ })).toBeNull()
   })
 })
+
+describe('importar una rutina', () => {
+  beforeEach(async () => {
+    // El catálogo real tiene nombres largos; el JSON del modelo los abrevia.
+    await db.ejercicios.bulkAdd([
+      ficha('e1', 'Press de banca con barra'),
+      ficha('e2', 'Remo con barra'),
+      ficha('e3', 'Press banca', true),
+    ])
+  })
+
+  it('enseña el emparejamiento de cada nombre antes de crear nada', async () => {
+    const usuario = userEvent.setup()
+    pintar()
+    await pegar(usuario, JSON_RUTINA)
+
+    // «press banca» empareja con el del catálogo aunque no se escriba igual…
+    expect(await screen.findByText('→ Press de banca con barra')).toBeDefined()
+    // …y lo que no está se avisa, en vez de crearse a la callada.
+    expect(screen.getByText('se creará nuevo')).toBeDefined()
+    expect(await db.rutinas.count()).toBe(0)
+  })
+
+  it('no empareja con un ejercicio archivado, aunque el nombre sea exacto', async () => {
+    const usuario = userEvent.setup()
+    pintar()
+    await pegar(usuario, JSON_RUTINA)
+
+    await screen.findByText('→ Press de banca con barra')
+    expect(screen.queryByText('en tu catálogo')).toBeNull()
+  })
+
+  it('crea la rutina con sus días y objetivos, y sin activarla', async () => {
+    const usuario = userEvent.setup()
+    pintar()
+    await pegar(usuario, JSON_RUTINA)
+    await usuario.click(await screen.findByRole('button', { name: /Crear «Full body/ }))
+
+    await waitFor(async () => expect(await db.rutinas.count()).toBe(1))
+    const rutina = (await db.rutinas.toArray())[0]
+    expect(rutina).toMatchObject({ nombre: 'Full body 3 días', activa: false })
+
+    const dias = await db.rutina_dias.where('rutina_id').equals(rutina.id).toArray()
+    expect(dias.map((d) => d.nombre)).toEqual(['Día A — Empuje'])
+
+    const ejercicios = await esperar(() =>
+      db.rutina_ejercicios.where('dia_id').equals(dias[0].id).sortBy('orden'),
+    )
+    expect(ejercicios).toHaveLength(2)
+    expect(ejercicios[0]).toMatchObject({
+      ejercicio_id: 'e1',
+      series_objetivo: 4,
+      reps_objetivo: '6-8',
+      rir_objetivo: 2,
+    })
+    // El que faltaba se ha creado, con su nombre tal cual venía.
+    const nuevo = await db.ejercicios.get(ejercicios[1].ejercicio_id)
+    expect(nuevo?.nombre).toBe('Face pull')
+    // Lo que el JSON no trae se rellena con los objetivos por defecto de la
+    // app, que es lo que la vista previa ha enseñado.
+    expect(ejercicios[1]).toMatchObject({ series_objetivo: 3, reps_objetivo: '12-15', rir_objetivo: 2 })
+  })
+})
+
+describe('importar fichas de alimentos', () => {
+  it('guarda los valores por 100 g en la biblioteca', async () => {
+    const usuario = userEvent.setup()
+    pintar()
+    await pegar(usuario, JSON_FICHAS)
+
+    expect(await screen.findByText(/1 ficha/)).toBeDefined()
+    expect(await db.alimentos.count()).toBe(0)
+
+    await usuario.click(screen.getByRole('button', { name: /Añadir la ficha/ }))
+    await waitFor(async () => expect(await db.alimentos.count()).toBe(1))
+
+    expect((await db.alimentos.toArray())[0]).toMatchObject({
+      nombre: 'Tortilla de patatas casera',
+      kcal_100g: 168,
+      proteina_100g: 5.1,
+      porcion_defecto_g: 150,
+      origen: 'importado',
+    })
+  })
+
+  it('avisa de una ficha cuyos macros no cuadran con las kcal', async () => {
+    const usuario = userEvent.setup()
+    pintar()
+    await pegar(
+      usuario,
+      '{"tipo":"alimentos","alimentos":[{"nombre":"Inventado","kcal_100g":500,"proteina_100g":1,"grasa_100g":1,"carbos_100g":1}]}',
+    )
+
+    expect(await screen.findByText(/no cuadran/)).toBeDefined()
+  })
+})
+
+/** La rutina se escribe fila a fila; el botón vuelve antes de la última. */
+async function esperar<T>(leer: () => Promise<T[]>): Promise<T[]> {
+  let filas: T[] = []
+  await waitFor(async () => {
+    filas = await leer()
+    expect(filas.length).toBe(2)
+  })
+  return filas
+}
+
+function ficha(id: string, nombre: string, archivado = false) {
+  return {
+    id,
+    nombre,
+    grupo_muscular: null,
+    equipamiento: null,
+    es_unilateral: false,
+    notas: null,
+    archivado,
+    created_at: null,
+    updated_at: null,
+  } as unknown as Parameters<typeof db.ejercicios.add>[0]
+}

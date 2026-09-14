@@ -90,15 +90,22 @@ export function interpretar(texto: string): Estimacion {
     throw new ErrorDeFormato('No has pegado nada.')
   }
 
-  let bruto: unknown
   try {
-    bruto = JSON.parse(limpio)
-  } catch {
+    return interpretarBruto(JSON.parse(limpio))
+  } catch (e) {
+    if (e instanceof ErrorDeFormato) throw e
     throw new ErrorDeFormato(
       'Eso no es JSON válido. Copia la respuesta entera de Claude, desde la primera llave hasta la última.',
     )
   }
+}
 
+/**
+ * La parte de después de `JSON.parse`. Se expone aparte porque el sobre
+ * (`sobre.ts`) ya ha analizado el texto para saber de qué tipo es, y volver a
+ * parsearlo sería hacer el trabajo dos veces.
+ */
+export function interpretarBruto(bruto: unknown): Estimacion {
   const lista = listaDeAlimentos(bruto)
 
   if (!lista.length) {
@@ -223,6 +230,7 @@ function esObjeto(v: unknown): v is Record<string, unknown> {
 export const INSTRUCCIONES_PARA_CLAUDE = `Cuando te mande una foto de comida, respóndeme SOLO con un bloque JSON con este formato exacto, sin texto alrededor:
 
 {
+  "tipo": "comida",
   "alimentos": [
     {
       "nombre": "Pechuga de pollo a la plancha",
@@ -242,4 +250,5 @@ Reglas:
 - "kcal", "proteina", "grasa" y "carbos" son del total servido, NO por 100 g, y
   son obligatorios los cuatro. Números, con punto decimal.
 - "momento" es uno de: desayuno, almuerzo, cena, snack.
+- "tipo" va siempre, y siempre vale "comida".
 - Nada de comentarios, unidades ni texto fuera del JSON.`

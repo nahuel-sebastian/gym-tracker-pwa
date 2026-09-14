@@ -114,7 +114,7 @@ export default function Comida() {
           Pega el JSON que te devuelve Claude al analizar la foto de un plato.
         </p>
         <Link
-          to="/comida/importar"
+          to="/importar"
           className="flex min-h-12 items-center justify-center rounded-xl border border-borde font-medium active:bg-fondo"
         >
           Pegar un JSON

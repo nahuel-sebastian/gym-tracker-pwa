@@ -10,7 +10,7 @@ const titulos: Record<string, string> = {
   '/ajustes': 'Ajustes',
   '/entreno/rutinas': 'Rutinas',
   '/entreno/catalogo': 'Ejercicios',
-  '/comida/importar': 'Importar macros',
+  '/importar': 'Importar',
   '/comida/recetas': 'Recetas',
   '/progreso/fotos': 'Fotos de progreso',
 }
@@ -24,7 +24,8 @@ export default function Cabecera() {
     pathname.startsWith('/entreno/') ||
     pathname.startsWith('/comida/') ||
     pathname.startsWith('/progreso/') ||
-    pathname === '/ajustes'
+    pathname === '/ajustes' ||
+    pathname === '/importar'
   const titulo = titulos[pathname] ?? (pathname.startsWith('/entreno/sesion/') ? 'Sesión' : 'Hoy')
 
   return (

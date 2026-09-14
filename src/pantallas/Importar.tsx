@@ -1,84 +1,79 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
-import { Boton, Campo, CampoNumero, Segmentado, Tarjeta } from '../componentes/Formulario'
-import { registrarImportado } from '../lib/acciones'
-import { useHoy } from '../lib/consultas'
+import { Boton, Tarjeta } from '../componentes/Formulario'
+import VistaComida from '../componentes/importar/VistaComida'
+import VistaFichas from '../componentes/importar/VistaFichas'
+import VistaRutina from '../componentes/importar/VistaRutina'
+import { useEjercicios } from '../lib/consultas'
 import { jsonDeEnlace } from '../lib/enlaces'
-import { ErrorDeFormato, estimarMacros, type AlimentoEstimado } from '../lib/estimacion'
-import { sumarDias } from '../lib/fechas'
-import { NOMBRE_MOMENTO, OPCIONES_MOMENTO, momentoSugerido } from '../lib/momentos'
-import { aNumero, aTexto, formatoKcal, formatoNumero } from '../lib/numeros'
-import { sumarMacros } from '../lib/nutricion'
+import { interpretarBruto, type AlimentoEstimado } from '../lib/estimacion'
+import { interpretarFichas, type FichaImportada } from '../lib/fichasImportadas'
+import { interpretarRutina, type RutinaImportada } from '../lib/rutinaImportada'
+import { ErrorDeSobre, NOMBRE_TIPO, analizar } from '../lib/sobre'
 import type { Momento } from '../lib/tipos'
 
 /**
- * Puente manual de macros: el usuario analiza la foto en la aplicación de
- * Claude y pega aquí el JSON que le devuelve.
+ * Una sola puerta de entrada para todo lo que se importa.
  *
- * Entre pegar y guardar hay una vista previa editable a propósito. Lo que llega
- * es una estimación de un modelo, no una medida: corregir 180 g por 150 g antes
- * de confirmar es parte del flujo, no una excepción.
+ * No hay que elegir el tipo: **el JSON dice lo que es**. Pedirlo sería pedir un
+ * dato que el texto ya lleva dentro, y abrir la puerta a elegir mal —"rutina" y
+ * pegar una comida—. Cada tipo tiene su vista previa, y ninguna guarda nada
+ * hasta que se confirma: lo que llega es una estimación de un modelo, no una
+ * medida.
  */
+type Leido =
+  | { tipo: 'comida'; alimentos: AlimentoEstimado[]; momento: Momento | null }
+  | { tipo: 'rutina'; rutina: RutinaImportada }
+  | { tipo: 'alimentos'; fichas: FichaImportada[] }
+
 export default function Importar() {
-  const fechaHoy = useHoy()
   const navegar = useNavigate()
   const { pathname, hash, search } = useLocation()
+  const catalogo = useEjercicios('', true)
 
-  // El JSON puede venir en la propia URL: es lo que manda el Atajo de iOS
-  // desde la hoja de compartir de la app de Claude.
   const delEnlace = useMemo(() => jsonDeEnlace(hash, search), [hash, search])
 
   const [texto, setTexto] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [alimentos, setAlimentos] = useState<AlimentoEstimado[] | null>(null)
-  const [ayer, setAyer] = useState(false)
-  const [momento, setMomento] = useState<Momento>(momentoSugerido())
-  const [aBiblioteca, setABiblioteca] = useState(true)
-  const [guardando, setGuardando] = useState(false)
+  const [leido, setLeido] = useState<Leido | null>(null)
 
-  const fecha = ayer ? sumarDias(fechaHoy, -1) : fechaHoy
-
-  /**
-   * Si llegó por enlace, se interpreta solo: compartir desde Claude tiene que
-   * dejarte directamente en la vista previa, sin un toque más.
-   *
-   * Y después se limpia la URL. Si no, la comida se quedaría en el historial de
-   * Safari y recargar la página la volvería a importar.
-   */
   useEffect(() => {
     if (!delEnlace) return
 
-    // El texto se escribe en el campo aparte de interpretarlo, y no basta con
-    // inicializar el estado: en el primer render la ruta puede no traer todavía
-    // el fragmento. Si falla el JSON, el campo es el único sitio donde queda
-    // para poder arreglarlo — la URL ya se ha limpiado.
+    // El texto se escribe además de interpretarse: si el JSON viene mal, el
+    // campo es el único sitio donde queda para arreglarlo, porque la URL se
+    // limpia justo después. Y no basta con inicializar el estado: en el primer
+    // render la ruta puede no traer todavía el fragmento.
     setTexto(delEnlace)
-    void interpretarTexto(delEnlace)
+    leer(delEnlace)
 
-    // Se limpia con el propio router, no con `history.replaceState`: éste no le
-    // dice nada a React Router, y al volver a renderizar por el `setTexto` el
-    // router reponía su URL interna, que aún llevaba el fragmento.
+    // Con el router, no con `history.replaceState`: éste no le dice nada a
+    // React Router, y al re-renderizar reponía su URL interna con el fragmento.
     navegar(pathname, { replace: true })
-    // Solo al llegar: reinterpretarlo en cada render sería absurdo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [delEnlace])
 
-  async function interpretarTexto(entrada: string) {
+  function leer(entrada: string) {
     setError(null)
     try {
-      const estimacion = await estimarMacros({ tipo: 'texto', contenido: entrada })
-      setAlimentos(estimacion.alimentos)
-      if (estimacion.momento) setMomento(estimacion.momento)
+      const { tipo, bruto } = analizar(entrada)
+
+      if (tipo === 'rutina') {
+        setLeido({ tipo, rutina: interpretarRutina(bruto, catalogo) })
+      } else if (tipo === 'alimentos') {
+        setLeido({ tipo, fichas: interpretarFichas(bruto) })
+      } else {
+        const estimacion = interpretarBruto(bruto)
+        setLeido({ tipo, alimentos: estimacion.alimentos, momento: estimacion.momento })
+      }
     } catch (e) {
-      setAlimentos(null)
+      setLeido(null)
       setError(
-        e instanceof ErrorDeFormato ? e.message : 'No he podido leer eso. Revisa el formato.',
+        e instanceof Error && (e instanceof ErrorDeSobre || e.name === 'ErrorDeFormato')
+          ? e.message
+          : 'No he podido leer eso. Revisa el formato.',
       )
     }
-  }
-
-  async function interpretar() {
-    await interpretarTexto(texto)
   }
 
   async function pegar() {
@@ -87,33 +82,19 @@ export default function Importar() {
       setTexto(delPortapapeles)
       setError(null)
     } catch {
-      // Safari solo deja leer el portapapeles con un gesto del usuario y a
+      // Safari solo deja leer el portapapeles con un gesto del usuario, y a
       // veces ni así: no es un error que merezca alarmar, se pega a mano.
       setError('Tu navegador no me deja leer el portapapeles. Pega el texto a mano.')
     }
   }
-
-  async function confirmar() {
-    if (!alimentos?.length) return
-    setGuardando(true)
-    try {
-      await registrarImportado(fecha, momento, alimentos, aBiblioteca)
-      navegar('/')
-    } finally {
-      setGuardando(false)
-    }
-  }
-
-  const total = alimentos ? sumarMacros(alimentos) : null
-  const sinGramos = alimentos?.filter((a) => !a.gramos).length ?? 0
 
   return (
     <div className="space-y-4">
       <Tarjeta>
         <h2 className="text-base font-semibold">Pega el JSON de Claude</h2>
         <p className="mb-3 mt-1 text-sm text-tenue">
-          Las instrucciones para que te lo devuelva con este formato están en Ajustes.
-          Con el Atajo de iOS puedes compartirlo desde Claude y llegar aquí directo.
+          Comidas, rutinas o fichas de alimentos. No hace falta decir qué es: se
+          reconoce solo. Las instrucciones de cada cosa están en Ajustes.
         </p>
 
         <textarea
@@ -127,7 +108,7 @@ export default function Importar() {
           autoCapitalize="none"
           autoCorrect="off"
           aria-label="JSON de la comida"
-          placeholder={'{\n  "alimentos": [ … ],\n  "momento": "almuerzo"\n}'}
+          placeholder={'{\n  "tipo": "rutina",\n  …\n}'}
           className="w-full resize-y rounded-xl border border-borde bg-fondo p-3 font-mono text-sm outline-none focus:border-acento"
         />
 
@@ -135,7 +116,7 @@ export default function Importar() {
           <Boton variante="secundario" onClick={() => void pegar()}>
             Pegar
           </Boton>
-          <Boton onClick={() => void interpretar()} disabled={!texto.trim()}>
+          <Boton onClick={() => leer(texto)} disabled={!texto.trim()}>
             Interpretar
           </Boton>
         </div>
@@ -145,151 +126,30 @@ export default function Importar() {
             {error}
           </p>
         )}
+
+        {leido && (
+          <p className="mt-2 text-sm text-acento">
+            Reconocido: {NOMBRE_TIPO[leido.tipo].toLowerCase()}.
+          </p>
+        )}
       </Tarjeta>
 
-      {alimentos && (
-        <>
-          <Tarjeta>
-            <div className="flex items-baseline justify-between">
-              <h2 className="text-base font-semibold">
-                {alimentos.length} {alimentos.length === 1 ? 'alimento' : 'alimentos'}
-              </h2>
-              {total && (
-                <span className="cifras text-sm text-tenue">
-                  {formatoKcal(total.kcal)} kcal · P {formatoNumero(total.proteina)} · G{' '}
-                  {formatoNumero(total.grasa)} · C {formatoNumero(total.carbos)}
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-sm text-tenue">
-              Corrige lo que haga falta antes de guardar. Es una estimación, no una medida.
-            </p>
-          </Tarjeta>
+      {leido?.tipo === 'comida' && (
+        <VistaComida
+          alimentos={leido.alimentos}
+          momentoDelJson={leido.momento}
+          onCambio={(alimentos) => setLeido({ ...leido, alimentos })}
+          onHecho={() => navegar('/')}
+        />
+      )}
 
-          {alimentos.map((a, i) => (
-            <FilaAlimento
-              key={i}
-              alimento={a}
-              onCambio={(nuevo) =>
-                setAlimentos((previos) =>
-                  (previos ?? []).map((otro, j) => (i === j ? nuevo : otro)),
-                )
-              }
-              onQuitar={() =>
-                setAlimentos((previos) => (previos ?? []).filter((_, j) => i !== j))
-              }
-            />
-          ))}
+      {leido?.tipo === 'rutina' && (
+        <VistaRutina rutina={leido.rutina} onHecho={() => navegar('/entreno/rutinas')} />
+      )}
 
-          <Tarjeta>
-            <span className="mb-1 block text-sm text-tenue">Día</span>
-            <Segmentado
-              opciones={[
-                { valor: 'hoy', etiqueta: 'Hoy' },
-                { valor: 'ayer', etiqueta: 'Ayer' },
-              ]}
-              valor={ayer ? 'ayer' : 'hoy'}
-              onCambio={(v) => setAyer(v === 'ayer')}
-            />
-
-            <span className="mb-1 mt-3 block text-sm text-tenue">Momento</span>
-            <Segmentado opciones={OPCIONES_MOMENTO} valor={momento} onCambio={setMomento} />
-
-            <label className="mt-3 flex min-h-12 items-center gap-3">
-              <input
-                type="checkbox"
-                checked={aBiblioteca}
-                onChange={(e) => setABiblioteca(e.target.checked)}
-                className="h-5 w-5 accent-[var(--color-acento)]"
-              />
-              <span className="text-sm">Guardar también en mi biblioteca</span>
-            </label>
-
-            {aBiblioteca && sinGramos > 0 && (
-              <p className="mt-1 text-xs text-tenue">
-                {sinGramos === 1
-                  ? 'Un alimento no trae gramos, así que no se puede pasar a ficha por 100 g. Se registrará igual, suelto.'
-                  : `${sinGramos} alimentos no traen gramos, así que no se pueden pasar a ficha por 100 g. Se registrarán igual, sueltos.`}
-              </p>
-            )}
-
-            <div className="mt-3">
-              <Boton
-                onClick={() => void confirmar()}
-                disabled={!alimentos.length || guardando}
-              >
-                {guardando
-                  ? 'Guardando…'
-                  : `Añadir a ${NOMBRE_MOMENTO[momento].toLowerCase()} de ${ayer ? 'ayer' : 'hoy'}`}
-              </Boton>
-            </div>
-          </Tarjeta>
-        </>
+      {leido?.tipo === 'alimentos' && (
+        <VistaFichas fichas={leido.fichas} onHecho={() => navegar('/comida')} />
       )}
     </div>
-  )
-}
-
-function FilaAlimento({
-  alimento,
-  onCambio,
-  onQuitar,
-}: {
-  alimento: AlimentoEstimado
-  onCambio: (a: AlimentoEstimado) => void
-  onQuitar: () => void
-}) {
-  const poner = (campo: keyof AlimentoEstimado) => (e: { target: { value: string } }) => {
-    const valor = aNumero(e.target.value)
-    onCambio({ ...alimento, [campo]: campo === 'gramos' ? valor : (valor ?? 0) })
-  }
-
-  return (
-    <Tarjeta>
-      <div className="flex items-start gap-2">
-        <div className="flex-1">
-          <Campo
-            etiqueta="Nombre"
-            value={alimento.nombre}
-            onChange={(e) => onCambio({ ...alimento, nombre: e.target.value })}
-          />
-        </div>
-        <button
-          onClick={onQuitar}
-          aria-label={`Quitar ${alimento.nombre}`}
-          className="mt-6 flex h-12 w-11 items-center justify-center rounded-xl text-error active:bg-fondo"
-        >
-          ✕
-        </button>
-      </div>
-
-      <div className="mt-3 grid grid-cols-2 gap-3">
-        <CampoNumero
-          etiqueta="Gramos"
-          sufijo="g"
-          value={aTexto(alimento.gramos)}
-          onChange={poner('gramos')}
-        />
-        <CampoNumero etiqueta="Kcal" value={aTexto(alimento.kcal)} onChange={poner('kcal')} />
-        <CampoNumero
-          etiqueta="Proteína"
-          sufijo="g"
-          value={aTexto(alimento.proteina)}
-          onChange={poner('proteina')}
-        />
-        <CampoNumero
-          etiqueta="Grasa"
-          sufijo="g"
-          value={aTexto(alimento.grasa)}
-          onChange={poner('grasa')}
-        />
-        <CampoNumero
-          etiqueta="Carbohidratos"
-          sufijo="g"
-          value={aTexto(alimento.carbos)}
-          onChange={poner('carbos')}
-        />
-      </div>
-    </Tarjeta>
   )
 }

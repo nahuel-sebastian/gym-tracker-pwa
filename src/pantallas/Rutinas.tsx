@@ -19,6 +19,7 @@ import {
   borrarRutina,
   crearRutina,
   mover,
+  rutinaComoJson,
   quitarEjercicioDeDia,
 } from '../lib/rutinas'
 import type { RutinaEjercicio } from '../lib/tipos'
@@ -77,6 +78,8 @@ export default function Rutinas() {
 
           <DiasDeRutina rutinaId={abierta.id} />
 
+          <CompartirRutina rutinaId={abierta.id} nombre={abierta.nombre} />
+
           {/* Borrar una rutina se lleva sus días y sus ejercicios por delante,
               así que va al final y en dos pasos. Las sesiones ya entrenadas
               sobreviven: su `dia_id` queda a null y conservan el nombre. */}
@@ -121,6 +124,67 @@ export default function Rutinas() {
         </Hoja>
       )}
     </div>
+  )
+}
+
+/**
+ * La rutina como JSON, para pasarla a otra cuenta.
+ *
+ * El mismo formato que acepta el importador, así que el viaje de vuelta no pasa
+ * por Claude: la app produce lo que la app entiende. Los ejercicios van por
+ * nombre porque los ids son de un usuario y no valen en el otro.
+ */
+function CompartirRutina({ rutinaId, nombre }: { rutinaId: string; nombre: string }) {
+  const [json, setJson] = useState<string | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
+
+  async function abrir() {
+    setAviso(null)
+    setJson(await rutinaComoJson(rutinaId))
+  }
+
+  // Safari de iPhone la tiene; los navegadores de escritorio, casi nunca. El
+  // tipado de TS la da por segura, de ahí el `typeof`.
+  const sePuedeCompartir = typeof navigator.share === 'function'
+
+  async function compartir(texto: string) {
+    // En el iPhone la hoja de compartir es el camino natural (WhatsApp, Notas).
+    // En el portátil casi nunca existe, y ahí el portapapeles es lo que hay.
+    try {
+      if (sePuedeCompartir) await navigator.share({ title: nombre, text: texto })
+      else {
+        await navigator.clipboard.writeText(texto)
+        setAviso('Copiado al portapapeles.')
+      }
+    } catch {
+      // Cancelar la hoja de compartir también lanza: no es un error que contar.
+    }
+  }
+
+  return (
+    <>
+      <Boton variante="secundario" onClick={() => void abrir()}>
+        Compartir esta rutina
+      </Boton>
+
+      {json !== null && (
+        <Hoja titulo={`Compartir «${nombre}»`} onCerrar={() => setJson(null)}>
+          <div className="space-y-3">
+            <p className="text-sm text-tenue">
+              Quien lo reciba lo pega en Importar y le sale la rutina entera. Los
+              ejercicios que no tenga en su catálogo se le crean.
+            </p>
+            <pre className="max-h-56 overflow-y-auto whitespace-pre-wrap break-words rounded-xl border border-borde bg-fondo p-3 text-xs leading-relaxed">
+              {json}
+            </pre>
+            <Boton onClick={() => void compartir(json)}>
+              {sePuedeCompartir ? 'Compartir' : 'Copiar'}
+            </Boton>
+            {aviso && <p className="text-sm text-tenue">{aviso}</p>}
+          </div>
+        </Hoja>
+      )}
+    </>
   )
 }
 

@@ -28,7 +28,7 @@ export default defineConfig({
         // fragmento—, pero declararlo no cuesta nada: funciona ya en Android y
         // el día que Safari lo implemente empieza a funcionar solo.
         share_target: {
-          action: '/comida/importar',
+          action: '/importar',
           method: 'GET',
           // Con GET el texto llega en la cadena de consulta, que sí viaja al
           // servidor. El Atajo usa el fragmento, que no.

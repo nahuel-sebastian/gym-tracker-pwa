@@ -394,7 +394,7 @@ El puente manual pasa de cuatro toques a uno. El JSON puede llegar en la propia
 URL y la pantalla de Importar lo interpreta sola:
 
 ```
-Claude → Compartir → Atajo → /comida/importar#json=…  → vista previa lista
+Claude → Compartir → Atajo → /importar#json=…  → vista previa lista
 ```
 
 - **Se prefiere el fragmento** (`#json=`) a la cadena de consulta. El fragmento
@@ -418,12 +418,65 @@ Claude → Compartir → Atajo → /comida/importar#json=…  → vista previa l
 
 1. *Recibir* **Texto** de la hoja de compartir.
 2. **Codificar URL** sobre ese texto.
-3. **Texto**: `https://<your-app>.vercel.app/comida/importar#json=` y detrás
+3. **Texto**: `https://<your-app>.vercel.app/importar#json=` y detrás
    la variable del paso 2.
 4. **Abrir URL** con el resultado.
 
 Nada de esto depende del proveedor: el Atajo solo mueve texto. Si algún día se
 llama a una API de visión, reutiliza el mismo enlace.
+
+### Importar tres cosas por la misma puerta
+
+La pantalla dejó de ser "importar macros" y pasó a `/importar`: entran comidas,
+rutinas y fichas de alimentos. Lo que decide qué es no es el usuario, es el JSON.
+
+- **El sobre** (`src/lib/sobre.ts`) mira el campo `tipo`, y si no viene lo deduce
+  por la forma: `dias` es una rutina, `alimentos` con `kcal_100g` son fichas, y
+  `alimentos` sin eso es una comida. Esto último no es un capricho: los JSON de
+  comida anteriores a esto no llevaban `tipo` y tienen que seguir entrando.
+  Un `tipo` que no se conoce da error nombrando los tres que sí.
+- **Elegir el tipo al importar sería pedir un dato que el texto ya lleva**, y
+  abrir la puerta a elegir mal. El desplegable está en Ajustes, donde es lo
+  único que se puede hacer: ahí todavía no hay JSON del que deducir nada, se
+  está montando el Proyecto de Claude que lo va a producir.
+- Las instrucciones de cada tipo viven **al lado de su parser**
+  (`estimacion.ts`, `rutinaImportada.ts`, `fichasImportadas.ts`) para que las
+  dos mitades del puente cambien a la vez.
+- La ruta vieja `/comida/importar` redirige a la nueva **arrastrando el
+  fragmento y la consulta**. El Atajo del iPhone ya creado apunta a la vieja, y
+  si la redirección perdiera el `#json=` compartir desde Claude dejaría de
+  importar sin dar ni un error. Tiene test.
+
+**Lo delicado de una rutina es el emparejamiento de nombres**, no leer el JSON:
+la rutina nombra sus ejercicios por nombre y la base los referencia por id. Si
+llega "press banca" y el catálogo tiene "Press de banca con barra", crear un
+duplicado parte el histórico del ejercicio en dos sin avisar.
+
+- Primero nombre exacto normalizado (sin acentos ni mayúsculas). Si no,
+  **por palabras**, ignorando las de unir (`de`, `con`, `la`…): los modelos
+  abrevian.
+- Solo empareja si **un único** ejercicio contiene todas las palabras. Con
+  "press banca" y el catálogo con la versión de barra *y* la de mancuernas,
+  elegir una sería adivinar: se crea uno nuevo y se dice.
+- Los archivados quedan fuera del índice, también del emparejamiento por
+  palabras: un ejercicio archivado no debe volver por la puerta de atrás.
+- **La vista previa enseña el emparejamiento antes de confirmar** —"→ Press de
+  banca con barra", "se creará nuevo"— y los objetivos ya rellenos con los
+  valores por defecto (3×8-10, RIR 2), porque es lo que se va a guardar; un "?"
+  ahí sería mentira.
+- **La rutina importada no se activa.** El índice único del servidor solo admite
+  una activa, y activar por sorpresa la que acabas de importar te cambiaría la
+  que estás haciendo.
+
+**El viaje de vuelta** no pasa por Claude: `rutinaComoJson` emite el mismo sobre
+que acepta el importador, con los ejercicios **por nombre y no por id** —los ids
+son de un usuario y no valen en otro—, y el botón está en Rutinas. En el iPhone
+usa la hoja de compartir del sistema; en el portátil, el portapapeles.
+
+**Las fichas de alimentos** hablan **por 100 g**, y ahí está todo el riesgo: es
+lo único que las separa de una comida, y equivocarse no da error, da una ficha
+falsa que contamina cada registro que la use después. Los cuatro macros son
+obligatorios, y la vista previa avisa de las que no cuadran con la regla 4/9/4.
 
 ### Una segunda cuenta
 
@@ -654,7 +707,7 @@ for f in supabase/migrations/*.sql; do echo; cat "$f"; done > docs/produccion.sq
 ### Desplegar
 
 `vercel.json` y `public/_redirects` resuelven las rutas del cliente: sin ellos,
-abrir `/comida/importar` directamente da un 404 en la primera carga (el service
+abrir `/importar` directamente da un 404 en la primera carga (el service
 worker lo cubre después con su `navigateFallback`, pero la primera visita no).
 El patrón de reescritura deja pasar los archivos reales —`/assets/*`, `sw.js`,
 el manifest, los iconos— y manda todo lo demás a `index.html`.
@@ -669,8 +722,6 @@ viaja con el repositorio.
 - `0005` es un bloque `DO`. Convertirlo en una función
   `sembrar_catalogo_ejercicios()` permitiría volver a llamarla sin repetir el
   SQL, útil para reconstruir el entorno local tras un `db reset`.
-- Falta el test del parser del JSON de macros, el otro sitio donde se pierden
-  datos en silencio. La cola ya está cubierta.
 - El bundle va por 560 kB (165 kB comprimido) porque Recharts entra en el
   chunk principal. Hay que cargar Progreso con `import()` diferido antes de
   dar la fase 5 por hecha; el plan pide abrir en menos de dos segundos.
