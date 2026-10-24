@@ -2,7 +2,7 @@
 
 Última actualización: 11 de septiembre de 2026.
 
-El plan original está en `docs/plan.md` y no se ha modificado. Este archivo
+El plan original (el encargo inicial) no se incluye en esta copia. Este archivo
 registra lo construido, las decisiones tomadas sobre el plan y cómo seguir.
 
 ---
@@ -604,7 +604,7 @@ Y de la capa offline, con `node scripts/verificar-offline.mjs` contra el REST re
 
 ## Decisiones tomadas sobre el plan
 
-Añadidos y correcciones respecto a `docs/plan.md`, con su motivo:
+Añadidos y correcciones respecto al plan original, con su motivo:
 
 1. **El cliente genera los uuid**, no la base de datos. Sin esto no se pueden
    crear filas relacionadas sin conexión (una sesión y sus series), y los
@@ -654,7 +654,7 @@ Añadidos y correcciones respecto a `docs/plan.md`, con su motivo:
 ## Siguiente paso
 
 **El plan está entregado completo.** Las seis fases, con todo lo que pedía
-`docs/plan.md` y nada de lo que dejaba fuera del alcance.
+el plan original y nada de lo que dejaba fuera del alcance.
 
 Lo que queda no es plan, es rodaje:
 

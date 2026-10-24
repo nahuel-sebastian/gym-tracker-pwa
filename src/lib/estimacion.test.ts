@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ErrorDeFormato, estimarMacros, interpretar, puenteManual } from './estimacion'
 
-/** El ejemplo exacto que trae `docs/plan.md`. */
+/** El ejemplo exacto que traía el plan original. */
 const DEL_PLAN = `{
   "alimentos": [
     {
